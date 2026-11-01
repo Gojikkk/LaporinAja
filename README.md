@@ -1,6 +1,80 @@
 # LaporinAja — Backend
 
-Express + Prisma backend for LaporinAja using PostgreSQL. All MVP contract endpoints are under `/api`. The frontend is a separate React application.
+LaporinAja adalah platform pelaporan masalah fasilitas publik (jalan berlubang, lampu mati, sampah, dll.) yang menekankan transparansi tindak lanjut. Pelapor dapat memantau status laporan secara real-time, membaca riwayat perubahan, dan melihat bukti penanganan dari administrator platform.
+
+## Tech stack
+
+| Layer | Teknologi |
+|---|---|
+| Runtime | Node.js 22 |
+| Framework | Express 5 |
+| Language | TypeScript 5 |
+| ORM | Prisma 7 (driver adapter `@prisma/adapter-pg`) |
+| Database | PostgreSQL 17 |
+| Auth | JWT (session cookie HttpOnly) + CSRF token |
+| Google Login | Google Identity Services (`google-auth-library`) |
+| Upload | Multer → Sharp (validasi + re-encode) → Cloudinary |
+| Validation | Zod |
+| Password | Argon2 |
+| Rate limiting | express-rate-limit |
+| API Docs | Swagger UI (`swagger-ui-express` + `swagger-jsdoc`) |
+| Testing | Vitest + Supertest |
+| Containerization | Docker + Docker Compose |
+
+## Cara menjalankan
+
+```sh
+# 1. Clone repo
+git clone https://github.com/Gojikkk/backend-LaporinAja.git
+cd backend-LaporinAja
+
+# 2. Install dependencies
+npm install
+
+# 3. Salin dan isi environment variables
+cp .env.example .env
+# Edit .env — isi DATABASE_URL, SESSION_SECRET, dan Cloudinary credentials
+
+# 4. Jalankan migrasi + generate Prisma client + seed data demo
+npm run db:deploy
+npm run prisma:generate
+npm run db:seed
+
+# 5. Jalankan dev server
+npm run dev
+```
+
+API tersedia di **http://localhost:3000**
+Dokumentasi Swagger di **http://localhost:3000/api-docs**
+
+> Atau pakai Docker: `docker compose up --build` (tidak perlu install PostgreSQL manual)
+
+## Progress saat ini
+
+| Fitur | Status |
+|---|---|
+| Landing page data (statistik publik, kategori) | ✅ Siap |
+| Registrasi & login (email/password + Google) | ✅ Siap |
+| Buat laporan dengan upload foto | ✅ Siap |
+| Daftar laporan publik (filter kategori, status, wilayah) | ✅ Siap |
+| Detail laporan publik (timeline, foto, follow-up) | ✅ Siap |
+| Dashboard pelapor (laporan sendiri + status counts) | ✅ Siap |
+| Tracking status & riwayat perubahan | ✅ Siap |
+| Dashboard admin (semua laporan + filter) | ✅ Siap |
+| Verifikasi / penolakan laporan | ✅ Siap |
+| Pembaruan status (IN_PROGRESS → RESOLVED) | ✅ Siap |
+| Catatan tindak lanjut + bukti foto | ✅ Siap |
+| Statistik publik & admin | ✅ Siap |
+| Validasi input + error Indonesia per field | ✅ Siap |
+| Proteksi CORS, CSRF, rate limit, Origin check | ✅ Siap |
+| Data demo (3 akun + 18 laporan beragam status) | ✅ Siap |
+| Dokumentasi API (Swagger UI) | ✅ Siap |
+| Penandaan laporan duplikat (FR-019) | 🔄 Should |
+| Pencarian kata kunci (FR-020) | 🔄 Should |
+| Notifikasi dalam aplikasi (FR-021) | 🔄 Should |
+| Peta lokasi laporan (FR-022) | 🔄 Could |
+
+---
 
 ## Table of contents
 
