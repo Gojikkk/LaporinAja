@@ -1,76 +1,366 @@
-# LaporinAja backend
+# LaporinAja — Backend
 
-Express and Prisma backend for LaporinAja using PostgreSQL. The MVP contract endpoints are under `/api`; the frontend is a separate React application.
+Express + Prisma backend for LaporinAja using PostgreSQL. All MVP contract endpoints are under `/api`. The frontend is a separate React application.
 
-## Project structure
+## Table of contents
 
-```text
-prisma/
-  migrations/       Database migrations
-  schema.prisma     Data models and relations
-  seed.ts           Repeatable initial category seed
-src/
-  app.ts            Express app configuration
-  server.ts         HTTP server entry point
-  config/           Application configuration
-  controllers/      HTTP request handlers
-  middlewares/      Express middleware
-  repositories/     Database access
-  routes/           API route definitions
-  services/         Application/business logic
-  types/            Shared TypeScript types
-  utils/            Shared utilities
-  validators/       Request validation schemas
-  db.ts             Prisma client
-  public-code.ts    Server-side public report code generator
-tests/
-  api-contract.test.ts
-```
+- [Requirements](#requirements)
+- [Quick start (local)](#quick-start-local)
+- [Quick start (Docker)](#quick-start-docker)
+- [Environment variables](#environment-variables)
+- [Demo accounts](#demo-accounts)
+- [Frontend integration](#frontend-integration)
+- [API contract](#api-contract)
+- [Project structure](#project-structure)
+- [Running tests](#running-tests)
+
+---
 
 ## Requirements
 
 - Node.js 20+
-- PostgreSQL
-- Docker and Docker Compose (optional, for containerized setup)
+- PostgreSQL 15+ (or Docker)
+- Cloudinary account (free tier works for demo)
 
-## Setup
+---
 
-1. Install dependencies with `npm install`.
-2. Copy `.env.example` to `.env`. The local defaults use the React origin `http://localhost:5173`, API `http://localhost:3000`, cookie `HttpOnly; SameSite=Lax; Secure=false`, and a 20 MB maximum request size.
-3. Set `SESSION_SECRET` to a random value with at least 32 characters. For HTTPS deployments set `SESSION_COOKIE_SECURE=true`.
-4. Set `DATABASE_URL` to your PostgreSQL connection string.
-5. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` from your Cloudinary dashboard. Optionally set `CLOUDINARY_FOLDER` (default `laporinaja`).
-6. Apply the migrations with `npm run db:deploy`.
-7. Generate the Prisma client with `npm run prisma:generate`.
-8. Populate the initial categories with `npm run db:seed`.
-9. Start the development server with `npm run dev`.
-
-The initial migration creates the six core entities, enums, relationships, unique constraints, indexes, and the sequence used to reserve public report codes. Prisma tracks applied migrations, so `npm run db:deploy` can be run repeatedly; the category seed uses upserts and is safe to repeat. Prisma 7 uses the PostgreSQL driver adapter configured in `src/db.ts`.
-
-`POST /api/reports` reserves a public code from PostgreSQL's sequence through `src/public-code.ts` and returns `LPR-<year>-<number>`; the unique constraint on `reports.public_code` remains the final integrity guard. Sequence gaps are expected if a reserved code is not used.
-
-## API contract
-
-- Success responses use `{ "data": ... }`. Lists use `{ "data": [], "meta": { "page": 1, "limit": 12, "total": 0 } }`; private list responses also include `counts` keyed by every report status.
-- Errors use `{ "error": { "code": "...", "message": "...", "fields": {} } }` with Indonesian messages and no stack traces.
-- Available endpoint groups: `/api/auth`, `/api/categories`, `/api/reports`, `/api/me/reports`, `/api/admin/reports`, `/api/stats/public`, and `/api/admin/stats`.
-- Browser mutations require an exact allowed `Origin`; authenticated mutations also require the `laporinaja_csrf` cookie value in the `X-CSRF-Token` header. The signed JWT session token stays in an HttpOnly cookie and must match an active database session, so logout revokes it immediately.
-- Google sign-in uses `POST /api/auth/google` with `{ "credential": "<Google ID token>" }`. Set `GOOGLE_CLIENT_ID` to the OAuth 2.0 Web client ID used by Google Identity Services; the backend verifies the token audience and verified email before creating a `PELAPOR` account or session.
-- React must send credentialed requests (`credentials: "include"` or `withCredentials: true`). For multipart requests, let the browser generate the `Content-Type` boundary.
-- Report images are checked against decoded image content and MIME, re-encoded with Sharp to remove metadata, and uploaded to Cloudinary as authenticated assets under a random public ID. The API proxies access through the signed media endpoint, so private reports are only served to authorized viewers.
-
-The selected local/demo topology is React `http://localhost:5173` to API `http://localhost:3000`, `SameSite=Lax`, `Secure=false` on local HTTP, 3 files maximum at 5 MB each, and 20 MB maximum request size. These settings are environment-configurable. A cross-site deployment needs an explicit cookie/CSRF design and HTTPS; do not disable Origin or CSRF checks.
-
-`npm test` runs mocked API contract tests for envelopes, CORS/Origin, cookie login/logout, authorization, idempotency, upload failure, status conflicts/transitions, rate limiting, public privacy DTOs, and both ways to resolve a report. The repository contains only the backend, so shared React–Express tests and a live PostgreSQL migration run require the separate frontend and a running PostgreSQL service.
-
-## Docker
-
-For local development, copy `.env.example` to `.env`, then run:
+## Quick start (local)
 
 ```sh
+# 1. Install dependencies
+npm install
+
+# 2. Copy and fill in environment variables
+cp .env.example .env
+# Edit .env — minimum required: DATABASE_URL, SESSION_SECRET,
+# CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+
+# 3. Apply database migrations
+npm run db:deploy
+
+# 4. Generate Prisma client
+npm run prisma:generate
+
+# 5. Seed categories + demo accounts + demo reports
+npm run db:seed
+
+# 6. Start development server (hot reload)
+npm run dev
+```
+
+API is now available at **http://localhost:3000**.  
+Health check: `GET http://localhost:3000/health` → `{ "status": "ok" }`
+
+---
+
+## Quick start (Docker)
+
+```sh
+cp .env.example .env
+# Edit .env — fill in Cloudinary credentials at minimum
+
 docker compose up --build
 ```
 
-Compose starts PostgreSQL and the API, waits until PostgreSQL is healthy, applies migrations and the repeatable category seed, then starts Express. The API is available at `http://localhost:3000` and `GET /health` can be used to check it. PostgreSQL data is persisted in the `postgres_data` volume. Image uploads are stored in Cloudinary, so the Cloudinary credentials from `.env` must be set before starting the stack.
+Docker Compose will:
+1. Start PostgreSQL 17 and wait until it is healthy
+2. Build the API image, apply migrations, run seed, then start Express
 
-The credentials in `.env.example` are for local development only; change them before using this setup outside a local machine. Stop the containers with `docker compose down`. Removing the database volume with `docker compose down --volumes` permanently deletes local database data.
+API: **http://localhost:3000** — PostgreSQL data persists in the `postgres_data` volume.
+
+To stop and remove containers (keep data):
+```sh
+docker compose down
+```
+
+To also delete the database volume (irreversible):
+```sh
+docker compose down --volumes
+```
+
+---
+
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in all required values.
+
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | ✅ | — | PostgreSQL connection string |
+| `SESSION_SECRET` | ✅ | — | Min 32 chars, random string |
+| `CLOUDINARY_CLOUD_NAME` | ✅ | — | From Cloudinary dashboard |
+| `CLOUDINARY_API_KEY` | ✅ | — | From Cloudinary dashboard |
+| `CLOUDINARY_API_SECRET` | ✅ | — | From Cloudinary dashboard |
+| `PORT` | | `3000` | API listen port |
+| `FRONTEND_ORIGINS` | | `http://localhost:5173` | Comma-separated allowed origins |
+| `SESSION_COOKIE_SECURE` | | `false` | Set `true` for HTTPS deployments |
+| `SESSION_TTL_DAYS` | | `7` | Session lifetime in days |
+| `GOOGLE_CLIENT_ID` | | — | Required only for Google login |
+| `CLOUDINARY_FOLDER` | | `laporinaja` | Cloudinary upload folder |
+| `MAX_UPLOAD_REQUEST_BYTES` | | `20971520` | 20 MB max multipart request |
+| `POSTGRES_DB` | | `laporinaja` | Docker Compose only |
+| `POSTGRES_USER` | | `laporinaja` | Docker Compose only |
+| `POSTGRES_PASSWORD` | | `laporinaja_dev` | Docker Compose only |
+| `POSTGRES_PORT` | | `5432` | Docker Compose only |
+
+> **Security note:** `SESSION_SECRET` must be a strong random secret and must never be committed to version control. Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
+
+---
+
+## Demo accounts
+
+After running `npm run db:seed`, the following accounts are available:
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@demo.test` | `Admin1234!` |
+| Pelapor | `budi@demo.test` | `Budi1234!` |
+| Pelapor | `siti@demo.test` | `Siti1234!` |
+
+The seed also creates **18 demo reports** covering all status values:
+
+| Status | Count | Notes |
+|---|---|---|
+| `SUBMITTED` | 4 | Awaiting review |
+| `VERIFIED` | 3 | Confirmed by admin, including 1 hidden |
+| `IN_PROGRESS` | 3 | Being handled |
+| `RESOLVED` | 3 | Completed with follow-up notes |
+| `REJECTED` | 2 | With rejection reasons |
+| `DUPLICATE` | 1 | Demo entry per PRD §20; automated action remains a Should |
+
+The seed is **idempotent** — running `npm run db:seed` multiple times is safe. Categories are upserted, users are upserted by fixed UUID, and reports are skipped if the UUID already exists.
+
+---
+
+## Frontend integration
+
+The local/demo topology is:
+
+| | Value |
+|---|---|
+| React dev server | `http://localhost:5173` |
+| API base URL | `http://localhost:3000` |
+| Cookie `SameSite` | `Lax` |
+| Cookie `Secure` | `false` (local HTTP) |
+
+### CORS and credentials
+
+All browser requests to the API must include credentials:
+
+```ts
+// fetch
+fetch("http://localhost:3000/api/auth/me", { credentials: "include" });
+
+// axios
+axios.defaults.withCredentials = true;
+```
+
+The API allows only origins listed in `FRONTEND_ORIGINS`. Any other origin receives `403 ORIGIN_FORBIDDEN`.
+
+### CSRF protection
+
+All mutating requests (`POST`, `PATCH`, `DELETE`) from an authenticated session require the `X-CSRF-Token` header. The CSRF token is set as a **readable** (non-HttpOnly) cookie named `laporinaja_csrf` at login. Read it in your frontend and attach it to every mutation:
+
+```ts
+function getCsrfToken(): string {
+  return document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("laporinaja_csrf="))
+    ?.split("=")[1] ?? "";
+}
+
+// Example mutation
+fetch("http://localhost:3000/api/reports", {
+  method: "POST",
+  credentials: "include",
+  headers: { "X-CSRF-Token": getCsrfToken() },
+  body: formData,           // multipart — do NOT set Content-Type manually
+});
+```
+
+For `application/json` mutations, also set `Content-Type`:
+
+```ts
+fetch("http://localhost:3000/api/auth/logout", {
+  method: "POST",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "X-CSRF-Token": getCsrfToken(),
+  },
+});
+```
+
+### File uploads
+
+Submit photos as `multipart/form-data` using the field name `photos` (max 3 files, 5 MB each). Let the browser set `Content-Type` (do not set it manually — the boundary must be browser-generated):
+
+```ts
+const form = new FormData();
+form.append("categoryId", "1");
+form.append("title", "...");
+// ... other fields
+form.append("photos", file1);
+form.append("photos", file2);
+
+fetch("http://localhost:3000/api/reports", {
+  method: "POST",
+  credentials: "include",
+  headers: { "X-CSRF-Token": getCsrfToken() },
+  body: form,
+});
+```
+
+### Session flow
+
+```
+POST /api/auth/login  →  sets laporinaja_session (HttpOnly) + laporinaja_csrf (readable)
+GET  /api/auth/me     →  returns { data: { id, name, role } }
+POST /api/auth/logout →  requires X-CSRF-Token, clears both cookies
+```
+
+Google sign-in:
+```ts
+// After Google Identity Services returns a credential token
+fetch("http://localhost:3000/api/auth/google", {
+  method: "POST",
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ credential: googleIdToken }),
+});
+```
+
+---
+
+## API contract
+
+### Response envelopes
+
+```jsonc
+// Success (single)
+{ "data": { ... } }
+
+// Success (list)
+{ "data": [...], "meta": { "page": 1, "limit": 12, "total": 42 } }
+
+// List with status counts (authenticated owner/admin)
+{ "data": [...], "meta": { ... }, "counts": { "SUBMITTED": 2, "VERIFIED": 1, ... } }
+
+// Error
+{ "error": { "code": "ERROR_CODE", "message": "Pesan dalam bahasa Indonesia" } }
+
+// Validation error with field details
+{ "error": { "code": "VALIDATION_ERROR", "message": "Data tidak valid", "fields": { "email": "Email tidak valid" } } }
+```
+
+### Endpoint groups
+
+| Group | Prefix | Auth required |
+|---|---|---|
+| Health | `/health` | No |
+| Auth | `/api/auth` | Varies |
+| Categories | `/api/categories` | No |
+| Public reports | `/api/reports` | No |
+| My reports | `/api/me/reports` | PELAPOR |
+| Admin reports | `/api/admin/reports` | ADMIN |
+| Public stats | `/api/stats/public` | No |
+| Admin stats | `/api/admin/stats` | ADMIN |
+| Media proxy | `/api/media/:id` | Varies |
+
+### Key endpoints
+
+```
+GET    /api/categories
+GET    /api/reports                    ?category=&status=&district=&village=&page=&limit=
+GET    /api/reports/:code
+
+POST   /api/reports                    multipart/form-data, PELAPOR + CSRF
+GET    /api/me/reports                 ?status=
+GET    /api/me/reports/:code
+
+GET    /api/admin/reports              ?status=&category=
+GET    /api/admin/reports/:code
+POST   /api/admin/reports/:code/follow-ups   multipart/form-data, ADMIN + CSRF
+POST   /api/admin/reports/:code/status       JSON, ADMIN + CSRF
+
+GET    /api/stats/public
+GET    /api/admin/stats                ADMIN
+
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/google
+POST   /api/auth/logout                CSRF required
+GET    /api/auth/me
+```
+
+---
+
+## Project structure
+
+```
+prisma/
+  migrations/         Database migrations (SQL)
+  schema.prisma       Data models, enums, and relations
+  seed.ts             Idempotent seed: categories + demo users + demo reports
+src/
+  app.ts              Express app setup (middleware pipeline)
+  server.ts           HTTP server entry point
+  db.ts               Prisma client singleton
+  config/
+    env.ts            Typed environment variable loader
+  controllers/
+    auth.controller.ts
+    media.controller.ts
+    report.controller.ts
+    stats.controller.ts
+  middlewares/
+    auth.ts           Session, CSRF, requireAuth, requireRole, optionalAuth
+    errors.ts         Global error handler (no stack traces in response)
+    security.ts       CORS + Origin allowlist
+  routes/
+    index.ts          Router aggregator
+    auth.routes.ts
+    health.routes.ts
+    media.routes.ts
+    reports.routes.ts
+    stats.routes.ts
+  services/
+    auth.service.ts
+    media.service.ts
+    report.service.ts
+    stats.service.ts
+  types/
+    express.d.ts      Extend req.user, req.sessionToken, req.csrfHash
+  utils/
+    http-error.ts     HttpError class
+    media-signature.ts  HMAC-signed media URL generation and validation
+    public-code.ts    PostgreSQL sequence-based LPR-YYYY-NNNNNN generator
+    responses.ts      sendData / sendList helpers
+    uploads.ts        Sharp image validation + Cloudinary upload/delete
+    validation.ts     parseBody / parseQuery / pagination helpers
+tests/
+  api-contract.test.ts   Mocked contract tests (28 cases)
+  setup.ts
+```
+
+---
+
+## Running tests
+
+```sh
+npm test
+```
+
+Tests use Vitest with mocked Prisma, Cloudinary, and argon2. No running database or Cloudinary account is needed. All 28 test cases cover:
+
+- Response envelopes and HTTP status codes
+- CORS / Origin enforcement
+- Cookie-based session login/logout with CSRF
+- Authorization (role, suspended account)
+- Input validation with Indonesian field errors
+- Idempotent report submission
+- Image upload validation and Cloudinary transaction safety
+- Status transition rules and conflict detection
+- Public report privacy (no reporter identity leaks)
+- Public and admin statistics with edge cases (empty data → zero)
+- Signed media access control
