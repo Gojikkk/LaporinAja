@@ -1,6 +1,6 @@
 ﻿import { Prisma, ReportStatus } from "@prisma/client";
 import { prisma } from "../db";
-import { generatePublicCode } from "../public-code";
+import { generatePublicCode } from "../utils/public-code";
 import { HttpError } from "../utils/http-error";
 import { mediaUrl } from "../utils/media-signature";
 import { deleteStoredImages, storeImages } from "../utils/uploads";
