@@ -1,0 +1,1353 @@
+/* ------------------------------------------------------------------------- */
+/* Tema bersama LAP-23 / LAP-30                                               */
+/* Halaman publik dan pelapor memakai bahasa visual yang sama dengan ruang    */
+/* kerja admin: kanvas #F8FAFC, judul #102D3B, aksen #096B70, kartu putih     */
+/* bergaris #E2E8F0 dengan sudut 12px. Semua aturan dibatasi .app-theme agar  */
+/* halaman admin (.adm) tidak tersentuh.                                     */
+/* ------------------------------------------------------------------------- */
+
+html:has(.app-theme) {
+  --app-navy: #102d3b;
+  --app-teal: #096b70;
+  --app-teal-dark: #07575b;
+  --app-teal-soft: #e8f4f2;
+  --app-teal-line: #cfe6e3;
+  --app-ink: #0f172a;
+  --app-body: #475569;
+  --app-muted: #64748b;
+  --app-line: #e2e8f0;
+  --app-canvas: #f8fafc;
+  --app-head: #f1f5f9;
+  --app-danger: #b91c1c;
+  --app-danger-soft: #fef2f2;
+  --app-warning: #b45309;
+  --app-warning-soft: #fffbeb;
+  --app-orange: #f97316;
+  --app-orange-dark: #ea6a0c;
+  --app-on-orange: #0f172a;
+  --app-navy-line: #24485a;
+  --app-on-dark: #c4dadd;
+  --app-on-dark-soft: #9fb8bd;
+  --app-on-dark-accent: #9cd3d2;
+  --app-shadow: 0 10px 30px rgba(16, 45, 59, 0.08);
+}
+
+html:has(.app-theme) body {
+  background: var(--app-canvas);
+  color: var(--app-ink);
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.app-theme {
+  display: contents;
+}
+
+.app-theme h1,
+.app-theme h2,
+.app-theme h3,
+.app-theme .brand,
+.app-theme .stat-value {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: var(--app-navy);
+}
+
+.app-theme :focus-visible {
+  outline: 3px solid var(--app-teal);
+  outline-offset: 3px;
+}
+
+.app-theme a:hover {
+  color: var(--app-teal);
+}
+
+/* tombol: teks harus stabil, tidak berubah saat hover/fokus */
+.app-theme a.button:hover,
+.app-theme a.button:focus-visible {
+  color: var(--app-on-orange);
+}
+
+.app-theme a.button.outline:hover,
+.app-theme a.button.outline:focus-visible {
+  color: var(--app-navy);
+}
+
+.app-theme a.button.quiet:hover,
+.app-theme a.button.quiet:focus-visible {
+  color: var(--app-navy);
+}
+
+/* ------------------------------------------------------------------ header */
+
+.app-theme .topbar {
+  background: #fff;
+  border-bottom: 1px solid var(--app-line);
+  height: 88px;
+}
+
+.app-theme .nav-wrap {
+  max-width: 1280px;
+  padding: 0 80px;
+}
+
+.app-theme .main-nav {
+  gap: 36px;
+}
+
+.app-theme .nav-link {
+  font-size: 14px;
+}
+
+/* "Masuk" pada header publik memakai bidang putih bergaris, bukan teks polos. */
+.app-theme .topbar .button.quiet {
+  background: #fff;
+  border-color: var(--app-line);
+  color: var(--app-navy);
+}
+
+.app-theme .topbar .button.quiet:hover {
+  background: var(--app-canvas);
+}
+
+@media (max-width: 1000px) {
+  .app-theme .nav-wrap {
+    padding: 0 32px;
+  }
+
+  .app-theme .main-nav {
+    gap: 22px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-theme .topbar {
+    height: 72px;
+  }
+
+  .app-theme .nav-wrap {
+    padding: 0 20px;
+  }
+
+  .app-theme .main-nav {
+    top: 71px;
+    gap: 0;
+    border-bottom: 1px solid var(--app-line);
+  }
+
+  .app-theme .topbar .button.quiet {
+    border-color: var(--app-line);
+  }
+}
+
+@media (max-width: 430px) {
+  .app-theme .nav-wrap {
+    padding: 0 16px;
+  }
+}
+
+.app-theme .brand {
+  color: var(--app-navy);
+}
+
+.app-theme .brand > span:last-child > span {
+  color: var(--app-teal);
+}
+
+.app-theme .brand small {
+  color: var(--app-muted);
+}
+
+.app-theme .brand-mark {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .nav-link {
+  color: var(--app-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-theme .nav-link:hover,
+.app-theme .nav-link.active {
+  color: var(--app-teal);
+}
+
+.app-theme .nav-link.active:after {
+  width: 22px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--app-teal);
+}
+
+.app-theme .role-pill {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .icon-button:hover {
+  background: var(--app-head);
+}
+
+.app-theme .notice-button {
+  border-color: var(--app-line);
+}
+
+.app-theme .notice-button i {
+  background: var(--app-teal);
+  border-color: #fff;
+}
+
+.app-theme .avatar {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+/* ----------------------------------------------------------------- tombol */
+
+.app-theme .button {
+  min-height: 45px;
+  border-radius: 8px;
+  background: var(--app-orange);
+  color: var(--app-on-orange);
+  font-size: 13px;
+  font-weight: 700;
+  border-color: transparent;
+}
+
+.app-theme .button:hover {
+  background: var(--app-orange-dark);
+  color: var(--app-on-orange);
+}
+
+.app-theme .button.outline {
+  background: #fff;
+  color: var(--app-navy);
+  border-color: var(--app-line);
+}
+
+.app-theme .button.outline:hover {
+  background: var(--app-canvas);
+  border-color: #cbd5e1;
+}
+
+.app-theme .button.quiet {
+  background: transparent;
+  color: var(--app-navy);
+}
+
+.app-theme .button.quiet:hover {
+  background: var(--app-head);
+}
+
+.app-theme .button.danger {
+  background: var(--app-danger);
+}
+
+.app-theme .button.danger:hover {
+  background: #991b1b;
+}
+
+/* ------------------------------------------------------------------ hero */
+
+.app-theme .hero {
+  background: var(--app-canvas);
+  border-bottom: 1px solid var(--app-line);
+}
+
+.app-theme .eyebrow {
+  color: var(--app-teal);
+  letter-spacing: 1.4px;
+}
+
+.app-theme .eyebrow > span {
+  background: var(--app-teal);
+  box-shadow: 0 0 0 4px var(--app-teal-soft);
+}
+
+.app-theme .hero-copy h1,
+.app-theme .page-intro h1,
+.app-theme .detail-heading h1,
+.app-theme .section-head h2 {
+  color: var(--app-navy);
+  letter-spacing: -1.8px;
+}
+
+.app-theme .steps-title h2,
+.app-theme .auth-aside h1 {
+  color: #fff;
+  letter-spacing: -1.8px;
+}
+
+.app-theme .hero-copy h1 em,
+.app-theme .section-head h2 em {
+  color: var(--app-teal);
+}
+
+.app-theme .steps-title h2 em,
+.app-theme .auth-aside h1 em {
+  color: #7dd3d0;
+}
+
+.app-theme .hero-copy > p,
+.app-theme .section-head.compact p,
+.app-theme .page-intro p {
+  color: var(--app-body);
+}
+
+.app-theme .hero-note {
+  color: var(--app-muted);
+}
+
+.app-theme .hero-note svg {
+  color: var(--app-teal);
+}
+
+.app-theme .hero-bottom {
+  color: var(--app-muted);
+  border-top: 1px solid transparent;
+}
+
+.app-theme .hero-bottom-line {
+  background: var(--app-line);
+}
+
+/* Hero tanpa ilustrasi dekoratif: satu kolom teks yang lapang. */
+.app-theme .hero-inner {
+  grid-template-columns: minmax(0, 720px);
+  min-height: 0;
+  padding-top: 72px;
+  padding-bottom: 64px;
+}
+
+.app-theme .hero-copy h1 {
+  font-size: 46px;
+}
+
+/* ------------------------------------------------------ kartu & bagian */
+
+.app-theme .section-head h2 {
+  color: var(--app-navy);
+}
+
+.app-theme .text-link {
+  color: var(--app-teal);
+}
+
+.app-theme .text-link:hover {
+  color: var(--app-teal-dark);
+}
+
+.app-theme .recent-section {
+  background: var(--app-canvas);
+  border-top: 1px solid var(--app-line);
+}
+
+.app-theme .stat-card,
+.app-theme .report-card,
+.app-theme .filter-panel,
+.app-theme .aside-card,
+.app-theme .panel,
+.app-theme .content-panel,
+.app-theme .dashboard-panel,
+.app-theme .report-form {
+  background: #fff;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+}
+
+.app-theme .stat-card:hover,
+.app-theme .report-card:hover {
+  box-shadow: var(--app-shadow);
+}
+
+.app-theme .stat-top {
+  color: var(--app-body);
+}
+
+.app-theme .stat-top i {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .stat-value {
+  color: var(--app-navy);
+}
+
+.app-theme .stat-detail {
+  color: var(--app-muted);
+}
+
+.app-theme .stat-trend {
+  color: #047857;
+}
+
+.app-theme .stat-note {
+  background: var(--app-navy);
+  color: #fff;
+  border-radius: 12px;
+}
+
+.app-theme .stat-note svg {
+  color: #7dd3d0;
+}
+
+.app-theme .stat-note span {
+  color: #cbd5e1;
+}
+
+.app-theme .stat-note b {
+  color: #fff;
+}
+
+.app-theme .stat-note:hover {
+  background: #0d2531;
+}
+
+/* Kartu laporan: bidang warna datar dengan ikon kategori, tanpa ilustrasi. */
+.app-theme .report-art,
+.app-theme .report-art.teal {
+  background: #e8f4f2;
+}
+
+.app-theme .report-art.blue {
+  background: #e6f0f4;
+}
+
+.app-theme .report-art.green {
+  background: #e9f3ee;
+}
+
+.app-theme .report-art.purple {
+  background: #ededf6;
+}
+
+.app-theme .report-art.red {
+  background: #f8ecea;
+}
+
+.app-theme .report-art.amber {
+  background: #f4efe4;
+}
+
+.app-theme .report-art {
+  height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-theme .art-symbol {
+  position: static;
+  transform: none;
+  font-size: 0;
+  color: var(--app-teal);
+  text-shadow: none;
+}
+
+.app-theme .art-symbol svg {
+  width: 34px;
+  height: 34px;
+}
+
+.app-theme .detail-art {
+  height: 220px;
+}
+
+.app-theme .detail-art .art-symbol svg {
+  width: 56px;
+  height: 56px;
+}
+
+.app-theme .art-code {
+  background: #fff;
+  color: var(--app-navy);
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+}
+
+/* ---------------------------------------------------------- status badge */
+
+.app-theme .badge {
+  border-radius: 8px;
+  padding: 4px 9px;
+  min-height: 26px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.app-theme .badge.submitted {
+  background: var(--app-head);
+  color: var(--app-body);
+}
+
+.app-theme .badge.verified {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.app-theme .badge.progress {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.app-theme .badge.resolved {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.app-theme .badge.rejected {
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
+}
+
+.app-theme .badge.duplicate {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.app-theme .round-link {
+  border-color: var(--app-line);
+  color: var(--app-body);
+}
+
+.app-theme .round-link:hover {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+/* ---------------------------------------------------------- langkah kerja */
+
+.app-theme .steps-section {
+  background: var(--app-navy);
+}
+
+.app-theme .steps-title .eyebrow {
+  color: #7dd3d0;
+}
+
+.app-theme .steps-title h2 {
+  color: #fff;
+}
+
+.app-theme .steps-title > p {
+  color: #cbd5e1;
+}
+
+.app-theme .steps-title .button.outline {
+  background: transparent;
+  color: #fff;
+  border-color: #ffffff40;
+}
+
+.app-theme .steps-list,
+.app-theme .step {
+  border-color: #1e3a4a;
+}
+
+.app-theme .step-number {
+  color: #7dd3d0;
+}
+
+.app-theme .step h3 {
+  color: #fff;
+}
+
+.app-theme .step p {
+  color: #94a3b8;
+}
+
+.app-theme .step > svg {
+  color: #7dd3d0;
+}
+
+/* ------------------------------------------------------ daftar & filter */
+
+.app-theme .filter-panel {
+  background: #fff;
+}
+
+.app-theme .search-field,
+.app-theme .select-field {
+  border-color: var(--app-line);
+  color: var(--app-muted);
+}
+
+.app-theme .search-field input,
+.app-theme .select-field select {
+  color: var(--app-ink);
+}
+
+.app-theme .search-field:focus-within {
+  outline: 3px solid var(--app-teal);
+  outline-offset: 1px;
+}
+
+.app-theme .result-count,
+.app-theme .pagination {
+  color: var(--app-muted);
+}
+
+.app-theme .pagination button {
+  border-color: var(--app-line);
+  color: var(--app-body);
+}
+
+.app-theme .pagination button:hover:not(:disabled) {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .pagination button.current-page {
+  background: var(--app-teal);
+  border-color: var(--app-teal);
+  color: #fff;
+}
+
+.app-theme .empty-state {
+  border: 1px dashed #cbd5e1;
+  background: #fff;
+  color: var(--app-muted);
+}
+
+.app-theme .empty-state > svg {
+  color: var(--app-teal);
+}
+
+.app-theme .empty-state h1,
+.app-theme .empty-state h2 {
+  color: var(--app-navy);
+}
+
+/* ------------------------------------------------------------- detail */
+
+.app-theme .back-link {
+  color: var(--app-body);
+}
+
+.app-theme .back-link:hover {
+  color: var(--app-teal);
+}
+
+.app-theme .detail-meta {
+  color: var(--app-muted);
+}
+
+.app-theme .detail-meta svg {
+  color: var(--app-teal);
+}
+
+.app-theme .detail-art {
+  border: 1px solid var(--app-line);
+}
+
+.app-theme .detail-block {
+  border-bottom-color: var(--app-line);
+}
+
+.app-theme .detail-block h2,
+.app-theme .aside-card h2 {
+  color: var(--app-navy);
+}
+
+.app-theme .detail-block > p {
+  color: var(--app-body);
+}
+
+.app-theme .privacy-hint {
+  color: var(--app-muted);
+}
+
+.app-theme .privacy-hint svg {
+  color: var(--app-teal);
+}
+
+.app-theme .aside-card-head > span,
+.app-theme .panel-head > span {
+  color: var(--app-muted);
+}
+
+.app-theme .timeline-item:not(:last-child):before {
+  background: var(--app-line);
+}
+
+.app-theme .timeline-dot {
+  border-color: #cbd5e1;
+  background: #fff;
+}
+
+.app-theme .timeline-item.done .timeline-dot {
+  background: var(--app-teal);
+  border-color: var(--app-teal);
+}
+
+.app-theme .timeline-title {
+  color: var(--app-navy);
+}
+
+.app-theme .timeline-item p,
+.app-theme .timeline-item small {
+  color: var(--app-muted);
+}
+
+.app-theme .location-card p {
+  color: var(--app-body);
+}
+
+.app-theme .location-card small {
+  color: var(--app-muted);
+}
+
+.app-theme .share-button {
+  border-color: var(--app-line);
+  color: var(--app-teal);
+}
+
+.app-theme .share-button:hover {
+  background: var(--app-teal-soft);
+}
+
+.app-theme .follow-card {
+  border-color: var(--app-line);
+  background: var(--app-canvas);
+}
+
+.app-theme .follow-icon {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .follow-card b {
+  color: var(--app-navy);
+}
+
+.app-theme .follow-card p,
+.app-theme .follow-card small {
+  color: var(--app-body);
+}
+
+/* --------------------------------------------------- statistik & panel */
+
+.app-theme .demo-banner {
+  background: var(--app-teal-soft);
+  border-color: var(--app-teal-line);
+  color: #0f5e62;
+}
+
+.app-theme .demo-banner svg {
+  color: var(--app-teal);
+}
+
+.app-theme .demo-banner b {
+  color: var(--app-navy);
+}
+
+.app-theme .panel-head h2 {
+  color: var(--app-navy);
+}
+
+.app-theme .panel-head p {
+  color: var(--app-muted);
+}
+
+.app-theme .tiny-tag {
+  border-color: var(--app-line);
+  color: var(--app-muted);
+}
+
+.app-theme .bar-row > div:first-child {
+  color: var(--app-muted);
+}
+
+.app-theme .bar-row b {
+  color: var(--app-body);
+}
+
+.app-theme .bar-track {
+  background: var(--app-head);
+}
+
+.app-theme .bar-track i {
+  background: var(--app-teal);
+}
+
+.app-theme .bar-track i.progress {
+  background: #0e7490;
+}
+
+.app-theme .bar-track i.resolved {
+  background: #059669;
+}
+
+.app-theme .bar-track i.duplicate {
+  background: #6d28d9;
+}
+
+.app-theme .chart-note {
+  color: var(--app-muted);
+}
+
+.app-theme .category-row {
+  border-bottom-color: var(--app-line);
+  color: var(--app-body);
+}
+
+.app-theme .category-row b {
+  color: var(--app-navy);
+}
+
+.app-theme .category-dot {
+  background: var(--app-teal);
+}
+
+.app-theme .category-row:nth-child(3) .category-dot {
+  background: #0e7490;
+}
+
+.app-theme .category-row:nth-child(4) .category-dot {
+  background: #64748b;
+}
+
+.app-theme .category-row:nth-child(5) .category-dot {
+  background: #6d28d9;
+}
+
+.app-theme .category-row:nth-child(6) .category-dot {
+  background: #b45309;
+}
+
+/* ------------------------------------------------------- tentang/prosa */
+
+.app-theme .about-steps > div {
+  border-top-color: var(--app-teal-line);
+}
+
+.app-theme .about-steps > div > span,
+.app-theme .form-section-title > span {
+  color: var(--app-teal);
+}
+
+.app-theme .about-steps p,
+.app-theme .prose p,
+.app-theme .content-panel > p {
+  color: var(--app-body);
+}
+
+.app-theme .status-list > div {
+  border-bottom-color: var(--app-line);
+}
+
+.app-theme .status-list > div > span:last-child {
+  color: var(--app-muted);
+}
+
+/* --------------------------------------------------------------- auth */
+
+.app-theme .auth-page {
+  background: var(--app-canvas);
+}
+
+.app-theme .auth-aside {
+  background: var(--app-navy);
+}
+
+.app-theme .auth-brand,
+.app-theme .auth-brand .brand {
+  color: #fff;
+}
+
+.app-theme .auth-brand .brand-mark {
+  background: #ffffff1a;
+  color: #7dd3d0;
+}
+
+.app-theme .auth-brand small {
+  color: #94a3b8;
+}
+
+.app-theme .auth-aside .eyebrow {
+  color: #7dd3d0;
+}
+
+.app-theme .auth-aside > div > p {
+  color: #cbd5e1;
+}
+
+.app-theme .auth-aside > small {
+  color: #94a3b8;
+}
+
+.app-theme .auth-back,
+.app-theme .auth-switch {
+  color: var(--app-muted);
+}
+
+.app-theme .auth-box h2 {
+  color: var(--app-navy);
+}
+
+.app-theme .auth-box > p {
+  color: var(--app-body);
+}
+
+.app-theme .auth-error {
+  color: var(--app-danger);
+}
+
+.app-theme .auth-switch a {
+  color: var(--app-teal);
+}
+
+.app-theme .auth-privacy {
+  color: var(--app-muted);
+}
+
+.app-theme .auth-privacy svg {
+  color: var(--app-teal);
+}
+
+.app-theme .form-field label,
+.app-theme .form-field > span {
+  color: var(--app-body);
+}
+
+.app-theme .form-field input,
+.app-theme .form-field textarea,
+.app-theme .form-field select {
+  border-color: var(--app-line);
+  color: var(--app-ink);
+}
+
+.app-theme .form-field input:focus,
+.app-theme .form-field textarea:focus,
+.app-theme .form-field select:focus {
+  border-color: var(--app-teal);
+  outline: 3px solid #096b7033;
+  outline-offset: 0;
+}
+
+.app-theme .form-field small,
+.app-theme .form-section-title p {
+  color: var(--app-muted);
+}
+
+.app-theme .form-section-title {
+  border-top-color: var(--app-line);
+}
+
+.app-theme .form-actions {
+  border-top-color: var(--app-line);
+}
+
+.app-theme .upload-field {
+  border-color: #cbd5e1;
+  background: var(--app-canvas);
+  color: var(--app-teal);
+}
+
+.app-theme .upload-field:hover {
+  background: var(--app-teal-soft);
+}
+
+.app-theme .upload-field b {
+  color: var(--app-navy);
+}
+
+/* ----------------------------------------------------- dashboard pelapor */
+
+.app-theme .my-report-row {
+  border-top-color: var(--app-line);
+}
+
+.app-theme .my-report-row:hover {
+  background: var(--app-canvas);
+}
+
+.app-theme .mini-art {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .mini-art.blue {
+  background: #e6f0f4;
+  color: #0e7490;
+}
+
+.app-theme .mini-art.green {
+  background: #e9f3ee;
+  color: #047857;
+}
+
+.app-theme .mini-art.amber {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.app-theme .my-report-copy small {
+  color: var(--app-muted);
+}
+
+.app-theme .row-arrow {
+  color: #94a3b8;
+}
+
+.app-theme .dashboard-note {
+  color: var(--app-muted);
+}
+
+.app-theme .dashboard-note svg {
+  color: var(--app-teal);
+}
+
+.app-theme .dashboard-note a {
+  color: var(--app-teal);
+}
+
+/* ------------------------------------------------------- modal & toast */
+
+.app-theme .modal-backdrop {
+  background: #102d3ba8;
+}
+
+.app-theme .modal {
+  border-radius: 14px;
+}
+
+.app-theme .modal-mark {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .modal h2 {
+  color: var(--app-navy);
+}
+
+.app-theme .modal-copy {
+  color: var(--app-body);
+}
+
+.app-theme .toast {
+  background: var(--app-navy);
+  border-radius: 12px;
+}
+
+.app-theme .toast > svg {
+  color: #7dd3d0;
+}
+
+/* --------------------------------------------------------------- footer */
+
+.app-theme .footer {
+  background: var(--app-navy);
+  border-top: 0;
+  color: var(--app-on-dark);
+}
+
+.app-theme .footer-inner {
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 48px 80px 28px;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px 48px;
+  align-items: start;
+}
+
+.app-theme .footer-brand {
+  color: #fff;
+  font-size: 20px;
+}
+
+.app-theme .footer-brand .brand-mark {
+  background: #ffffff1a;
+  color: var(--app-on-dark-accent);
+}
+
+.app-theme .footer-brand > span:last-child > span {
+  color: var(--app-on-dark-accent);
+}
+
+.app-theme .footer-about p {
+  margin: 14px 0 0;
+  max-width: 420px;
+  color: var(--app-on-dark-soft);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.app-theme .footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+}
+
+.app-theme .footer-links a {
+  color: var(--app-on-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-theme .footer-links a:hover {
+  color: #fff;
+}
+
+.app-theme .footer-bottom {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding-top: 20px;
+  border-top: 1px solid #ffffff1f;
+  color: var(--app-on-dark-soft);
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .app-theme .footer-inner {
+    padding: 40px 32px 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-theme .footer-inner {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 32px 20px 24px;
+  }
+
+  .app-theme .footer-links {
+    gap: 12px 20px;
+  }
+
+  .app-theme .footer-bottom {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 430px) {
+  .app-theme .footer-inner {
+    padding: 28px 16px 22px;
+  }
+
+  .app-theme .footer-links a {
+    font-size: 12px;
+  }
+}
+
+.app-theme .disclaimer {
+  border-bottom-color: var(--app-line);
+}
+
+.app-theme .disclaimer b {
+  color: var(--app-navy);
+}
+
+.app-theme .disclaimer p {
+  color: var(--app-muted);
+}
+
+.app-theme .disclaimer-icon {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .disclaimer > a {
+  border-color: var(--app-line);
+  color: var(--app-teal);
+}
+
+/* ----------------------------------------------- transisi halaman */
+
+.app-theme .page-fade {
+  animation: page-fade-in 0.32s ease both;
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-theme .page-fade {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------- gerakan antar elemen */
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.app-theme .report-grid .report-card,
+.app-theme .stats-grid > *,
+.app-theme .steps-list .step,
+.app-theme .stats-columns > *,
+.app-theme .my-report-list .my-report-row {
+  animation: card-in 0.45s ease backwards;
+}
+
+.app-theme .report-grid .report-card:nth-child(1) { animation-delay: 0.03s; }
+.app-theme .report-grid .report-card:nth-child(2) { animation-delay: 0.08s; }
+.app-theme .report-grid .report-card:nth-child(3) { animation-delay: 0.13s; }
+.app-theme .report-grid .report-card:nth-child(4) { animation-delay: 0.18s; }
+
+.app-theme .stats-grid > *:nth-child(2) { animation-delay: 0.08s; }
+.app-theme .stats-grid > *:nth-child(3) { animation-delay: 0.13s; }
+.app-theme .stats-grid > *:nth-child(4) { animation-delay: 0.18s; }
+
+.app-theme .steps-list .step:nth-child(1) { animation-delay: 0.03s; }
+.app-theme .steps-list .step:nth-child(2) { animation-delay: 0.08s; }
+.app-theme .steps-list .step:nth-child(3) { animation-delay: 0.13s; }
+.app-theme .steps-list .step:nth-child(4) { animation-delay: 0.18s; }
+
+.app-theme .stats-columns > *:nth-child(2) { animation-delay: 0.12s; }
+
+.app-theme .my-report-list .my-report-row:nth-child(2) { animation-delay: 0.05s; }
+.app-theme .my-report-list .my-report-row:nth-child(3) { animation-delay: 0.1s; }
+
+.app-theme .step:hover h3 { color: var(--app-teal); }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-theme .report-grid .report-card,
+  .app-theme .stats-grid > *,
+  .app-theme .steps-list .step,
+  .app-theme .stats-columns > *,
+  .app-theme .my-report-list .my-report-row {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------- dropdown */
+
+.app-theme select {
+  appearance: none;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--app-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.app-theme select option {
+  background: #fff;
+  color: var(--app-ink);
+}
+
+
+
+
+/* ------------------------------------------------------- dropdown */
+
+.app-theme .select-field {
+  position: relative;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.app-theme .select-field > svg {
+  flex: none;
+}
+
+.app-theme .select-trigger {
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--app-line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-theme .select-trigger:hover {
+  border-color: #9db4b0;
+}
+
+.app-theme .select-trigger:focus-visible {
+  outline: 3px solid var(--app-teal);
+  outline-offset: 2px;
+}
+
+.app-theme .select-chev {
+  flex: none;
+  transition: transform 0.2s ease;
+  color: var(--app-muted);
+}
+
+.app-theme .select-chev.open {
+  transform: rotate(180deg);
+}
+
+.app-theme .select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  box-shadow: 0 18px 44px rgba(16, 45, 59, 0.16);
+  padding: 6px;
+  z-index: 40;
+  max-height: 280px;
+  overflow: auto;
+  animation: menu-in 0.18s ease backwards;
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.app-theme .select-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--app-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-theme .select-option:hover,
+.app-theme .select-option.selected {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}

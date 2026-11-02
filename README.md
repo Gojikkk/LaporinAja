@@ -1,6 +1,6 @@
-# LaporinAja — Backend
+# LaporinAja
 
-LaporinAja adalah platform pelaporan masalah fasilitas publik (jalan berlubang, lampu mati, sampah, dll.) yang menekankan transparansi tindak lanjut. Pelapor dapat memantau status laporan secara real-time, membaca riwayat perubahan, dan melihat bukti penanganan dari administrator platform.
+LaporinAja adalah platform pelaporan masalah fasilitas publik (jalan berlubang, lampu mati, sampah, dll.) yang menekankan transparansi tindak lanjut. Pelapor dapat memantau status laporan secara real-time, membaca riwayat perubahan, dan melihat bukti penanganan dari administrator platform. Repository ini berisi backend Express di root dan frontend React di folder `frontend/`.
 
 ## Tech stack
 
@@ -48,6 +48,19 @@ API tersedia di **http://localhost:3000**
 Dokumentasi Swagger di **http://localhost:3000/api-docs**
 
 > Atau pakai Docker: `docker compose up --build` (tidak perlu install PostgreSQL manual)
+
+### Menjalankan frontend
+
+Jalankan backend dan database terlebih dahulu, lalu buka terminal terpisah:
+
+```sh
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Frontend tersedia di **http://localhost:5173**. Untuk build produksi, jalankan `npm run build` dari folder `frontend/`.
 
 ## Progress saat ini
 
