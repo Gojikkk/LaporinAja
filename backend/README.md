@@ -1,6 +1,6 @@
 # LaporinAja — Backend
 
-LaporinAja adalah platform pelaporan masalah fasilitas publik (jalan berlubang, lampu mati, sampah, dll.) yang menekankan transparansi tindak lanjut. Backend Express berada di folder `backend/`, sedangkan frontend React berada di folder `frontend/`.
+LaporinAja adalah platform pelaporan masalah fasilitas publik yang menekankan transparansi tindak lanjut. Folder ini berisi backend Express dan Prisma; frontend React berada di [`../frontend`](../frontend/). Panduan menjalankan seluruh aplikasi ada di [README utama](../README.md).
 
 ## Tech stack
 

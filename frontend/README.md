@@ -1,6 +1,6 @@
 # LaporinAja
 
-**LaporinAja** adalah website pelaporan masalah fasilitas publik (jalan berlubang, lampu mati, sampah menumpuk, saluran air tersumbat) yang menekankan transparansi tindak lanjut — pelapor tidak hanya mengirim laporan, tapi juga dapat memantau status, riwayat perubahan, dan bukti penanganan secara real-time. Prototype ini dibuat untuk kompetisi **Multimedia In Action (MIA) 2026 – Web In Action (WIA)**, kategori *Civic Reporting & Accountability*.
+**LaporinAja** adalah website pelaporan masalah fasilitas publik (jalan berlubang, lampu mati, sampah menumpuk, saluran air tersumbat) yang menekankan transparansi tindak lanjut. Folder ini berisi aplikasi frontend React; backend Express dan panduan menjalankan seluruh aplikasi ada di [README utama](../README.md).
 
 > ⚠️ Prototype kompetisi. Tidak ada integrasi dengan pemerintah atau instansi resmi.
 
@@ -12,7 +12,7 @@
 |---------|-----------|
 | UI Framework | React 18 + TypeScript |
 | Build Tool | Vite |
-| Styling | CSS Modules (custom design system, tanpa UI library) |
+| Styling | CSS responsif kustom (tanpa UI library) |
 | Routing | React Router v6 (BrowserRouter) |
 | HTTP Client | Fetch API (`credentials: "include"`, CSRF-aware) |
 | State/Demo Data | In-memory store (`report-store.ts`) |
@@ -29,7 +29,9 @@
 ### Clone → Install → Run
 
 ```sh
-# Dari root repository gabungan
+# Clone repository gabungan terlebih dahulu, lalu jalankan dari root:
+# git clone https://github.com/Gojikkk/backend-LaporinAja.git
+# cd backend-LaporinAja
 cd frontend
 
 # Install dependencies
@@ -50,7 +52,7 @@ Untuk build produksi: `npm run build` → hasil di folder `dist/`.
 
 ## Progress Saat Ini
 
-Frontend sudah mencakup seluruh alur **MVP (FR-001 s.d. FR-018)** dari PRD:
+Frontend menyediakan UI untuk halaman dan alur berikut:
 
 | Area | Status | Keterangan |
 |------|--------|------------|
@@ -66,7 +68,7 @@ Frontend sudah mencakup seluruh alur **MVP (FR-001 s.d. FR-018)** dari PRD:
 | Halaman sistem (403 / 404) | ✅ | |
 | Responsif (mobile–desktop) | ✅ | Breakpoint 360px – 1400px |
 
-Demo data tersedia di `src/shared/report-store.ts` — perubahan status admin langsung tercermin di halaman publik dan pelapor tanpa backend.
+Data daftar/detail laporan dan dashboard masih menggunakan demo store in-memory di `src/shared/report-store.ts`. Client API dan beberapa form sudah tersedia; integrasi seluruh halaman dengan backend masih bertahap.
 
 ---
 
@@ -102,7 +104,7 @@ Routing, komponen bersama, data demo, dan layar peran berada di modul terpisah a
 
 ## URL API per environment
 
-Salin `.env.example` menjadi `.env.local` untuk lokal dan atur `VITE_API_URL`. Contoh:
+Salin `.env.example` menjadi `.env.local` untuk lokal. URL default API lokal adalah `http://localhost:3000/api`, sesuai port backend pada repository ini. Ubah `VITE_API_URL` bila backend berjalan di alamat lain. Contoh deployment:
 
 ```dotenv
 VITE_API_URL=https://api.example.test/api

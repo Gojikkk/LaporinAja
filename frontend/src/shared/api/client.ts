@@ -1,4 +1,4 @@
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/$/, '')
 const CSRF_COOKIE = import.meta.env.VITE_CSRF_COOKIE_NAME || ''
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 const CSRF_ENDPOINT = import.meta.env.VITE_CSRF_ENDPOINT || ''
