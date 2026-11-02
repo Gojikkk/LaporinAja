@@ -81,6 +81,20 @@ function mutationHeaders(role?: string) {
   };
 }
 
+function reportSubmission() {
+  return request(app)
+    .post("/api/reports")
+    .set(mutationHeaders("PELAPOR"))
+    .field("categoryId", "1")
+    .field("title", "Lampu jalan mati dekat taman")
+    .field("description", "Lampu jalan di dekat taman tidak menyala selama tiga malam.")
+    .field("city", "Kota")
+    .field("district", "Kecamatan")
+    .field("village", "Kelurahan")
+    .field("locationDetail", "Dekat taman utama")
+    .field("submissionKey", "7f3e2cee-c90c-4a54-b12a-5a9c65a13590");
+}
+
 const reportData = {
   id: "91ab27ae-4f1c-4e31-87c9-f9ac11d1f6a2",
   publicCode: "LPR-2026-000001",
@@ -225,7 +239,10 @@ describe("API contract transport and authentication", () => {
       .send({ email: "RANI@example.test", password: "password123" });
     expect(login.status).toBe(200);
     expect(login.body.data).toEqual({ id: user.id, name: user.name, role: user.role });
-    const cookies = login.headers["set-cookie"] as string[];
+    const loginSetCookie = login.headers["set-cookie"];
+    const cookies = Array.isArray(loginSetCookie)
+      ? loginSetCookie
+      : typeof loginSetCookie === "string" ? [loginSetCookie] : [];
     expect(cookies.some((cookie) => cookie.includes("laporinaja_session=") &&
       cookie.includes("HttpOnly") && cookie.includes("SameSite=Lax"))).toBe(true);
     expect(cookies.some((cookie) => cookie.includes("laporinaja_csrf="))).toBe(true);
@@ -244,7 +261,10 @@ describe("API contract transport and authentication", () => {
     expect(logout.status).toBe(200);
     expect(logout.body).toEqual({ data: { ok: true } });
     expect(mocks.prisma.session.deleteMany).toHaveBeenCalled();
-    const clearedCookies = logout.headers["set-cookie"] as string[];
+    const logoutSetCookie = logout.headers["set-cookie"];
+    const clearedCookies = Array.isArray(logoutSetCookie)
+      ? logoutSetCookie
+      : typeof logoutSetCookie === "string" ? [logoutSetCookie] : [];
     expect(clearedCookies.some((cookie) => cookie.includes("laporinaja_session=;") &&
       /Expires=Thu, 01 Jan 1970/i.test(cookie))).toBe(true);
   });
@@ -341,7 +361,7 @@ describe("report and privacy contract", () => {
     expect(response.body.data.timeline[0].actorLabel).toBe("Administrator platform");
   });
 
-  it("serves signed evidence only when the report is public or the viewer is authorized", async () => {
+  it("TC-23 serves signed evidence only when the report is public or the viewer is authorized", async () => {
     const id = "223c0918-5f83-4a78-88da-110d04478f44";
     const key = "laporinaja/signed-photo";
     const image = await sharp({
@@ -464,7 +484,7 @@ describe("report and privacy contract", () => {
     expect(mocks.prisma.$transaction).toHaveBeenCalled();
   });
 
-  it("rejects invalid image bytes before inserting a report", async () => {
+  it("TC-09 rejects invalid image bytes before inserting a report", async () => {
     mocks.prisma.report.findUnique.mockResolvedValue(null);
     mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 1 });
     mocks.prisma.report.count.mockResolvedValue(0);
@@ -483,6 +503,163 @@ describe("report and privacy contract", () => {
     expect(response.status).toBe(422);
     expect(response.body.error.fields.photos).toBeDefined();
     expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
+  it("TC-09 requires a photo and rejects a fourth photo", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+
+    const missingPhotoResponse = await reportSubmission();
+    expect(missingPhotoResponse.status).toBe(422);
+    expect(missingPhotoResponse.body.error.fields.photos).toBe("Unggah 1 sampai 3 foto");
+
+    const tooManyPhotos = reportSubmission()
+      .attach("photos", png, { filename: "one.png", contentType: "image/png" })
+      .attach("photos", png, { filename: "two.png", contentType: "image/png" })
+      .attach("photos", png, { filename: "three.png", contentType: "image/png" })
+      .attach("photos", png, { filename: "four.png", contentType: "image/png" });
+    const tooManyResponse = await tooManyPhotos;
+    expect(tooManyResponse.status).toBe(422);
+    expect(tooManyResponse.body.error.fields.photos).toBe("Unggah maksimal 3 foto");
+    expect(mocks.cloudinary.uploader.upload_stream).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
+  it("TC-09 rejects a photo larger than 5 MB", async () => {
+    const oversizedPhoto = Buffer.alloc(5 * 1024 * 1024 + 1);
+    const response = await reportSubmission()
+      .attach("photos", oversizedPhoto, { filename: "large.png", contentType: "image/png" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.photos).toBe("Ukuran maksimum setiap foto adalah 5 MB");
+    expect(mocks.cloudinary.uploader.upload_stream).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
+  it("TC-09 rejects a valid image when its declared MIME type does not match its bytes", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    mocks.prisma.report.findUnique.mockResolvedValue(null);
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 1 });
+    const response = await reportSubmission()
+      .attach("photos", png, { filename: "photo.jpg", contentType: "image/jpeg" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.photos).toBe("MIME file tidak sesuai dengan isi gambar");
+    expect(mocks.cloudinary.uploader.upload_stream).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
+  it("TC-08 accepts three photos, strips EXIF metadata, and uses a random storage key", async () => {
+    const jpeg = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).jpeg()
+      .withExif({ IFD0: { Artist: "private metadata" } })
+      .toBuffer();
+    mocks.prisma.report.findUnique.mockResolvedValue(null);
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 1 });
+    mocks.prisma.report.count.mockResolvedValue(0);
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ value: 21n }]);
+    mocks.prisma.report.create.mockResolvedValue({
+      id: reportData.id,
+      publicCode: "LPR-2026-000021",
+      status: "SUBMITTED"
+    });
+    mocks.prisma.reportStatusHistory.create.mockResolvedValue({ id: "history-id" });
+    mocks.prisma.reportEvidence.createMany.mockResolvedValue({ count: 3 });
+    let uploadedBuffer: Buffer | undefined;
+    let uploadedOptions: { public_id: string } | undefined;
+    mocks.cloudinary.uploader.upload_stream.mockImplementation((options, callback) => ({
+      end: (buffer: Buffer) => {
+        uploadedBuffer = Buffer.from(buffer);
+        uploadedOptions = options;
+        callback(undefined, {
+          public_id: `${options.folder}/${options.public_id}`,
+          secure_url: `https://res.cloudinary.com/test-cloud/image/authenticated/${options.public_id}`,
+          format: "jpg",
+          bytes: buffer.length
+        });
+      }
+    }));
+
+    const response = await reportSubmission()
+      .attach("photos", jpeg, { filename: "one.jpg", contentType: "image/jpeg" })
+      .attach("photos", jpeg, { filename: "two.jpg", contentType: "image/jpeg" })
+      .attach("photos", jpeg, { filename: "three.jpg", contentType: "image/jpeg" });
+
+    expect(response.status).toBe(201);
+    expect(uploadedOptions?.public_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(mocks.cloudinary.uploader.upload_stream).toHaveBeenCalledTimes(3);
+    expect(uploadedBuffer).toBeDefined();
+    const uploadedMetadata = await sharp(uploadedBuffer!).metadata();
+    expect(uploadedMetadata.format).toBe("jpeg");
+    expect(uploadedMetadata.exif).toBeUndefined();
+  });
+
+  it("TC-09 reports Cloudinary upload failure and removes any earlier uploaded photo", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    mocks.prisma.report.findUnique.mockResolvedValue(null);
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 1 });
+    let uploadCount = 0;
+    let firstStorageKey = "";
+    mocks.cloudinary.uploader.upload_stream.mockImplementation((options, callback) => ({
+      end: (buffer: Buffer) => {
+        uploadCount += 1;
+        if (uploadCount === 2) {
+          callback(new Error("Cloudinary unavailable"));
+          return;
+        }
+        firstStorageKey = `${options.folder}/${options.public_id}`;
+        callback(undefined, {
+          public_id: firstStorageKey,
+          secure_url: `https://res.cloudinary.com/test-cloud/image/authenticated/${firstStorageKey}`,
+          format: "png",
+          bytes: buffer.length
+        });
+      }
+    }));
+
+    const response = await reportSubmission()
+      .attach("photos", png, { filename: "one.png", contentType: "image/png" })
+      .attach("photos", png, { filename: "two.png", contentType: "image/png" });
+
+    expect(response.status).toBe(502);
+    expect(response.body.error.code).toBe("UPLOAD_FAILED");
+    expect(mocks.cloudinary.uploader.destroy).toHaveBeenCalledWith(
+      firstStorageKey,
+      expect.objectContaining({ type: "authenticated" })
+    );
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
+  it("removes uploaded photos when the report database transaction fails", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    mocks.prisma.report.findUnique.mockResolvedValue(null);
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 1 });
+    mocks.prisma.report.count.mockResolvedValue(0);
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ value: 21n }]);
+    mocks.prisma.report.create.mockResolvedValue({
+      id: reportData.id,
+      publicCode: "LPR-2026-000021",
+      status: "SUBMITTED"
+    });
+    mocks.prisma.reportEvidence.createMany.mockRejectedValue(new Error("Database unavailable"));
+
+    const response = await reportSubmission()
+      .attach("photos", png, { filename: "photo.png", contentType: "image/png" });
+
+    expect(response.status).toBe(500);
+    expect(response.body.error.code).toBe("INTERNAL_ERROR");
+    expect(mocks.cloudinary.uploader.destroy).toHaveBeenCalledWith(
+      expect.stringMatching(/^laporinaja-test\/[0-9a-f-]{36}$/i),
+      expect.objectContaining({ type: "authenticated" })
+    );
   });
 
   it("requires a visual proof or a 30-character resolution explanation", async () => {
