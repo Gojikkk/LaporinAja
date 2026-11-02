@@ -293,6 +293,8 @@ POST   /api/auth/logout                CSRF required
 GET    /api/auth/me
 ```
 
+The `PELAPOR` endpoints under `/api/me/reports` return only the signed-in user's reports. The list supports `page`, `limit`, and `status` filters; its `counts` summarize all six statuses for that user. The detail endpoint includes the full status timeline and rejection reasons. Unknown report codes and reports owned by another user both return the same `404 NOT_FOUND` response.
+
 ---
 
 ## Project structure
@@ -339,7 +341,7 @@ src/
     uploads.ts        Sharp image validation + Cloudinary upload/delete
     validation.ts     parseBody / parseQuery / pagination helpers
 tests/
-  api-contract.test.ts   Mocked contract tests (28 cases)
+  api-contract.test.ts   Mocked contract tests
   setup.ts
 ```
 

@@ -305,16 +305,97 @@ describe("API contract transport and authentication", () => {
 });
 
 describe("report and privacy contract", () => {
-  it("returns a uniform 404 for a report code not owned by the pelapor", async () => {
+  it("returns the same 404 for an unknown or non-owned report code", async () => {
     mocks.prisma.report.findFirst.mockResolvedValue(null);
+    const responses = await Promise.all([
+      request(app)
+        .get("/api/me/reports/LPR-2026-000099")
+        .set("Origin", frontend)
+        .set("Cookie", sessionCookie("PELAPOR")),
+      request(app)
+        .get("/api/me/reports/LPR-2026-000002")
+        .set("Origin", frontend)
+        .set("Cookie", sessionCookie("PELAPOR"))
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([404, 404]);
+    expect(responses[0].body).toEqual(responses[1].body);
+    expect(responses[0].body.error.code).toBe("NOT_FOUND");
+    expect(mocks.prisma.report.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { publicCode: "LPR-2026-000099", reporterId: user.id }
+    }));
+    expect(mocks.prisma.report.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: { publicCode: "LPR-2026-000002", reporterId: user.id }
+    }));
+  });
+
+  it("TC-13 lists only the signed-in reporter's reports with pagination, status filter, and their status counts", async () => {
+    mocks.prisma.report.count.mockResolvedValue(1);
+    mocks.prisma.report.findMany.mockResolvedValue([{ ...reportData, status: "REJECTED" }]);
+    mocks.prisma.$queryRaw.mockResolvedValue([
+      { status: "SUBMITTED", count: 2n },
+      { status: "REJECTED", count: 1n }
+    ]);
+
     const response = await request(app)
-      .get("/api/me/reports/LPR-2026-000099")
+      .get("/api/me/reports?page=2&limit=1&status=REJECTED")
       .set("Origin", frontend)
       .set("Cookie", sessionCookie("PELAPOR"));
-    expect(response.status).toBe(404);
-    expect(response.body.error.code).toBe("NOT_FOUND");
+
+    expect(response.status).toBe(200);
+    expect(response.body.meta).toEqual({ page: 2, limit: 1, total: 1 });
+    expect(response.body.data.map((report: { code: string }) => report.code)).toEqual([reportData.publicCode]);
+    expect(response.body.counts).toEqual({
+      SUBMITTED: 2,
+      VERIFIED: 0,
+      IN_PROGRESS: 0,
+      RESOLVED: 0,
+      REJECTED: 1,
+      DUPLICATE: 0
+    });
+    expect(mocks.prisma.report.count).toHaveBeenCalledWith({
+      where: { reporterId: user.id, status: "REJECTED" }
+    });
+    expect(mocks.prisma.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { reporterId: user.id, status: "REJECTED" },
+      orderBy: { createdAt: "desc" },
+      skip: 1,
+      take: 1
+    }));
+    const statusCountQuery = mocks.prisma.$queryRaw.mock.calls[0];
+    expect(statusCountQuery[0].join("")).toContain("WHERE reporter_id = ");
+    expect(statusCountQuery[1]).toBe(user.id);
+  });
+
+  it("TC-20 returns the owner's complete status timeline, including rejection reasons", async () => {
+    const rejectedAt = new Date("2026-10-26T01:00:00.000Z");
+    mocks.prisma.report.findFirst.mockResolvedValue({
+      ...reportData,
+      status: "REJECTED",
+      statusHistories: [{
+        fromStatus: "SUBMITTED",
+        toStatus: "REJECTED",
+        reason: "Foto bukti belum jelas",
+        createdAt: rejectedAt,
+        user: { role: "ADMIN" }
+      }]
+    });
+
+    const response = await request(app)
+      .get("/api/me/reports/LPR-2026-000001")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie("PELAPOR"));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.timeline).toEqual([{
+      fromStatus: "SUBMITTED",
+      toStatus: "REJECTED",
+      reason: "Foto bukti belum jelas",
+      createdAt: rejectedAt.toISOString(),
+      actorLabel: "Administrator platform"
+    }]);
     expect(mocks.prisma.report.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: { publicCode: "LPR-2026-000099", reporterId: user.id }
+      where: { publicCode: "LPR-2026-000001", reporterId: user.id }
     }));
   });
 
