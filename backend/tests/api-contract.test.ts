@@ -1548,6 +1548,91 @@ describe("public report catalog (LAP-9)", () => {
     expect(mocks.prisma.report.findMany).not.toHaveBeenCalled();
   });
 
+  it("FR-020 searches public reports and composes q with the existing filters and pagination", async () => {
+    mocks.prisma.report.count.mockResolvedValue(1);
+    mocks.prisma.report.findMany.mockResolvedValue([reportData]);
+    const query = "lampu jalan";
+
+    const response = await request(app)
+      .get("/api/reports")
+      .query({
+        q: ` ${query} `,
+        category: "lampu-jalan",
+        status: "IN_PROGRESS",
+        district: "Kecamatan",
+        village: "Kelurahan",
+        page: "2",
+        limit: "5"
+      })
+      .set("Origin", frontend);
+
+    const searchWhere = {
+      isHidden: false,
+      status: { in: ["IN_PROGRESS"] },
+      OR: [
+        { publicCode: { contains: query, mode: "insensitive" } },
+        { title: { contains: query, mode: "insensitive" } },
+        { description: { contains: query, mode: "insensitive" } },
+        { city: { contains: query, mode: "insensitive" } },
+        { district: { contains: query, mode: "insensitive" } },
+        { village: { contains: query, mode: "insensitive" } },
+        { locationDetail: { contains: query, mode: "insensitive" } },
+        { category: { name: { contains: query, mode: "insensitive" } } }
+      ],
+      category: { slug: "lampu-jalan" },
+      district: "Kecamatan",
+      village: "Kelurahan"
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.body.meta).toEqual({ page: 2, limit: 5, total: 1 });
+    expect(response.body.data).toHaveLength(1);
+    expect(mocks.prisma.report.count).toHaveBeenCalledWith({ where: searchWhere });
+    expect(mocks.prisma.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: searchWhere,
+      orderBy: { createdAt: "desc" },
+      skip: 5,
+      take: 5
+    }));
+    expect(mocks.prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["empty", ""],
+    ["too long", "x".repeat(101)],
+    ["repeated", ["first", "second"]]
+  ])("FR-020 rejects an invalid %s search query", async (_label, q) => {
+    const response = await request(app)
+      .get("/api/reports")
+      .query({ q })
+      .set("Origin", frontend);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("BAD_REQUEST");
+    expect(mocks.prisma.report.count).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.findMany).not.toHaveBeenCalled();
+  });
+
+  it("FR-020 safely returns an empty result without exposing hidden or private reports", async () => {
+    mocks.prisma.report.count.mockResolvedValue(0);
+    mocks.prisma.report.findMany.mockResolvedValue([]);
+
+    const response = await request(app)
+      .get("/api/reports?q=not-found")
+      .set("Origin", frontend);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([]);
+    expect(response.body.meta).toEqual({ page: 1, limit: 12, total: 0 });
+    expect(mocks.prisma.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        isHidden: false,
+        status: { in: ["VERIFIED", "IN_PROGRESS", "RESOLVED", "DUPLICATE"] },
+        OR: expect.any(Array)
+      })
+    }));
+  });
+
   it("TC-20 returns timeline, notes, and signed evidence without reporter or individual admin identity", async () => {
     const photoId = "223c0918-5f83-4a78-88da-110d04478f44";
     const proofId = "7f3e2cee-c90c-4a54-b12a-5a9c65a13590";

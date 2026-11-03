@@ -662,10 +662,16 @@ const paths: Record<string, any> = {
       summary: "Daftar laporan publik",
       description:
         "Mengembalikan laporan yang tidak hidden dengan status publik (VERIFIED, IN_PROGRESS, RESOLVED, DUPLICATE).\n\n" +
-        "Filter `status` hanya menerima status publik — SUBMITTED dan REJECTED akan ditolak dengan 400.",
+        "Parameter `q` mencari kata kunci tanpa membedakan huruf besar/kecil pada kode, judul, deskripsi, lokasi, dan kategori. " +
+        "Pencarian dapat digabung dengan filter dan pagination; hanya laporan publik yang tidak hidden akan dikembalikan.",
       parameters: [
         { $ref: "#/components/parameters/PageParam" },
         { $ref: "#/components/parameters/LimitParam" },
+        {
+          name: "q", in: "query",
+          schema: { type: "string", minLength: 1, maxLength: 100 },
+          description: "Kata kunci opsional, 1–100 karakter",
+        },
         {
           name: "status", in: "query",
           schema: { $ref: "#/components/schemas/PublicReportStatus" },
