@@ -341,12 +341,13 @@ describe("report and privacy contract", () => {
     expect(responses.map((response) => response.status)).toEqual([404, 404]);
     expect(responses[0].body).toEqual(responses[1].body);
     expect(responses[0].body.error.code).toBe("NOT_FOUND");
-    expect(mocks.prisma.report.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+    expect(mocks.prisma.report.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { publicCode: "LPR-2026-000099", reporterId: user.id }
     }));
-    expect(mocks.prisma.report.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+    expect(mocks.prisma.report.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { publicCode: "LPR-2026-000002", reporterId: user.id }
     }));
+    expect(mocks.prisma.report.findFirst).toHaveBeenCalledTimes(2);
   });
 
   it("TC-13 lists only the signed-in reporter's reports with pagination, status filter, and their status counts", async () => {
@@ -477,7 +478,7 @@ describe("report and privacy contract", () => {
     }));
   });
 
-  it("enforces expectedStatus conflicts and invalid transitions", async () => {
+  it("TC-18 returns 409 when expectedStatus does not match the current status", async () => {
     mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "IN_PROGRESS" });
     const conflict = await request(app)
       .post("/api/admin/reports/LPR-2026-000001/status")
@@ -485,7 +486,11 @@ describe("report and privacy contract", () => {
       .send({ toStatus: "VERIFIED", expectedStatus: "SUBMITTED" });
     expect(conflict.status).toBe(409);
     expect(conflict.body.error.code).toBe("STATUS_CONFLICT");
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
 
+  it("TC-18 returns 422 for a transition that is not allowed", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "IN_PROGRESS" });
     const invalid = await request(app)
       .post("/api/admin/reports/LPR-2026-000001/status")
       .set(mutationHeaders("ADMIN"))
@@ -493,6 +498,173 @@ describe("report and privacy contract", () => {
     expect(invalid.status).toBe(422);
     expect(invalid.body.error.code).toBe("INVALID_TRANSITION");
     expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["SUBMITTED", "VERIFIED"],
+    ["SUBMITTED", "REJECTED"],
+    ["VERIFIED", "IN_PROGRESS"],
+    ["VERIFIED", "REJECTED"],
+    ["REJECTED", "SUBMITTED"]
+  ])("TC-15 allows the MVP transition %s to %s", async (fromStatus, toStatus) => {
+    const reason = toStatus === "REJECTED" || fromStatus === "REJECTED"
+      ? "Alasan koreksi valid"
+      : undefined;
+    const historyId = "9ed1209d-9b25-47b6-b88b-d7d33120f481";
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: fromStatus });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: fromStatus }]);
+    mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportStatusHistory.create.mockResolvedValue({ id: historyId });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus, expectedStatus: fromStatus, ...(reason ? { reason } : {}) });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({
+      code: "LPR-2026-000001",
+      status: toStatus,
+      historyId
+    });
+    expect(mocks.prisma.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: reportData.id, status: fromStatus },
+      data: expect.objectContaining({ status: toStatus })
+    }));
+    expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        reportId: reportData.id,
+        fromStatus,
+        toStatus,
+        changedBy: user.id,
+        reason: reason ?? null
+      })
+    }));
+    expect(mocks.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it.each([
+    ["SUBMITTED", "IN_PROGRESS"],
+    ["IN_PROGRESS", "DUPLICATE"],
+    ["RESOLVED", "IN_PROGRESS"]
+  ])("TC-15 does not enable the out-of-scope transition %s to %s", async (fromStatus, toStatus) => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: fromStatus });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus, expectedStatus: fromStatus, reason: "Alasan transisi valid" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("INVALID_TRANSITION");
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["SUBMITTED", "REJECTED", ""],
+    ["SUBMITTED", "REJECTED", "123456789"],
+    ["SUBMITTED", "REJECTED", "1234567890"],
+    ["REJECTED", "SUBMITTED", ""],
+    ["REJECTED", "SUBMITTED", "123456789"],
+    ["REJECTED", "SUBMITTED", "1234567890"]
+  ])("TC-16 applies the 10-character reason rule for %s to %s", async (fromStatus, toStatus, reason) => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: fromStatus });
+    const validReason = reason.length >= 10;
+    if (validReason) {
+      mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: fromStatus }]);
+      mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });
+      mocks.prisma.reportStatusHistory.create.mockResolvedValue({ id: "history-id" });
+    }
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus, expectedStatus: fromStatus, reason });
+
+    expect(response.status).toBe(validReason ? 200 : 422);
+    if (!validReason) {
+      expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+    }
+  });
+
+  it("TC-17 records the authenticated administrator as the status-change actor", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "SUBMITTED" });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "SUBMITTED" }]);
+    mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportStatusHistory.create.mockResolvedValue({ id: "history-id" });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus: "VERIFIED", expectedStatus: "SUBMITTED" });
+
+    expect(response.status).toBe(200);
+    expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ changedBy: user.id })
+    }));
+  });
+
+  it("TC-19 writes status and history inside one transaction", async () => {
+    let insideTransaction = false;
+    mocks.prisma.$transaction.mockImplementationOnce(async (operation: unknown) => {
+      expect(typeof operation).toBe("function");
+      insideTransaction = true;
+      try {
+        return await (operation as (tx: typeof mocks.prisma) => unknown)(mocks.prisma);
+      } finally {
+        insideTransaction = false;
+      }
+    });
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "SUBMITTED" });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "SUBMITTED" }]);
+    mocks.prisma.report.updateMany.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { count: 1 };
+    });
+    mocks.prisma.reportStatusHistory.create.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { id: "history-id" };
+    });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus: "VERIFIED", expectedStatus: "SUBMITTED" });
+
+    expect(response.status).toBe(200);
+    expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.prisma.report.updateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("TC-18 catches a status change that races with the request", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "SUBMITTED" });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "VERIFIED" }]);
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus: "REJECTED", expectedStatus: "SUBMITTED", reason: "Alasan penolakan valid" });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("STATUS_CONFLICT");
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it("TC-20 does not expose status-history edit or delete endpoints", async () => {
+    const historyId = "9ed1209d-9b25-47b6-b88b-d7d33120f481";
+    const [editStatus, deleteStatus, editHistory, deleteHistory] = await Promise.all([
+      request(app).put("/api/admin/reports/LPR-2026-000001/status").set(mutationHeaders("ADMIN")),
+      request(app).delete("/api/admin/reports/LPR-2026-000001/status").set(mutationHeaders("ADMIN")),
+      request(app).put(`/api/admin/reports/LPR-2026-000001/status-history/${historyId}`).set(mutationHeaders("ADMIN")),
+      request(app).delete(`/api/admin/reports/LPR-2026-000001/status-history/${historyId}`).set(mutationHeaders("ADMIN"))
+    ]);
+
+    expect([editStatus.status, deleteStatus.status, editHistory.status, deleteHistory.status])
+      .toEqual([404, 404, 404, 404]);
+    expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
   });
 
   it("returns the same 200 result for a retried submissionKey", async () => {
