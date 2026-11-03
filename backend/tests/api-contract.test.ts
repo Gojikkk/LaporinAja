@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => {
     prisma: {
       session: model(["create", "findUnique", "deleteMany"]),
       user: model(["create", "findUnique", "update"]),
-      reportCategory: model(["findMany", "findFirst"]),
+      reportCategory: model(["create", "findMany", "findFirst", "findUnique", "update"]),
       report: model(["count", "create", "createMany", "findFirst", "findUnique", "findMany", "updateMany"]),
       reportStatusHistory: model(["create", "findMany"]),
       reportFollowUp: model(["create", "findFirst", "findMany"]),
@@ -386,6 +386,154 @@ describe("report and privacy contract", () => {
     const statusCountQuery = mocks.prisma.$queryRaw.mock.calls[0];
     expect(statusCountQuery[0].join("")).toContain("WHERE reporter_id = ");
     expect(statusCountQuery[1]).toBe(user.id);
+  });
+
+  it("restricts category management to administrators", async () => {
+    const [unauthenticated, reporter] = await Promise.all([
+      request(app).get("/api/admin/categories").set("Origin", frontend),
+      request(app).get("/api/admin/categories")
+        .set("Origin", frontend)
+        .set("Cookie", sessionCookie("PELAPOR"))
+    ]);
+
+    expect(unauthenticated.status).toBe(401);
+    expect(reporter.status).toBe(403);
+    expect(mocks.prisma.reportCategory.findMany).not.toHaveBeenCalled();
+  });
+
+  it("lists active and inactive categories for administrators", async () => {
+    const categories = [
+      { id: 1, name: "Jalan rusak", slug: "jalan-rusak", isActive: true },
+      { id: 2, name: "Kategori lama", slug: "kategori-lama", isActive: false }
+    ];
+    mocks.prisma.reportCategory.findMany.mockResolvedValue(categories);
+
+    const response = await request(app)
+      .get("/api/admin/categories")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie("ADMIN"));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(categories);
+    expect(mocks.prisma.reportCategory.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      orderBy: { id: "asc" }
+    }));
+    expect(mocks.prisma.reportCategory.findMany).not.toHaveBeenCalledWith(expect.objectContaining({
+      where: { isActive: true }
+    }));
+  });
+
+  it("creates a category with a unique slug and active state", async () => {
+    const category = { id: 7, name: "Fasilitas kota", slug: "fasilitas-kota", isActive: true };
+    mocks.prisma.reportCategory.create.mockResolvedValue(category);
+
+    const response = await request(app)
+      .post("/api/admin/categories")
+      .set(mutationHeaders("ADMIN"))
+      .send({ name: category.name, slug: category.slug });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual(category);
+    expect(mocks.prisma.reportCategory.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: { name: category.name, slug: category.slug, isActive: true }
+    }));
+  });
+
+  it.each([
+    [{ name: "AB", slug: "valid-slug" }, "name"],
+    [{ name: "Nama valid", slug: "Invalid-Slug" }, "slug"],
+    [{ name: "Nama valid", slug: "valid-slug", isActive: "false" }, "isActive"]
+  ])("rejects invalid category input %#", async (body, field) => {
+    const response = await request(app)
+      .post("/api/admin/categories")
+      .set(mutationHeaders("ADMIN"))
+      .send(body);
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields).toHaveProperty(field);
+    expect(mocks.prisma.reportCategory.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ code: "P2002", meta: { target: ["name"] } }, "name"],
+    [{ code: "P2002", meta: { target: ["slug"] } }, "slug"]
+  ])("validates duplicate category %s values", async (error, field) => {
+    mocks.prisma.reportCategory.create.mockRejectedValue(error);
+
+    const response = await request(app)
+      .post("/api/admin/categories")
+      .set(mutationHeaders("ADMIN"))
+      .send({ name: "Fasilitas kota", slug: "fasilitas-kota" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields).toHaveProperty(field);
+  });
+
+  it("deactivates a category without deleting it", async () => {
+    const category = { id: 3, name: "Kategori lama", slug: "kategori-lama", isActive: false };
+    mocks.prisma.reportCategory.findUnique.mockResolvedValue({ id: category.id });
+    mocks.prisma.reportCategory.update.mockResolvedValue(category);
+
+    const response = await request(app)
+      .patch(`/api/admin/categories/${category.id}`)
+      .set(mutationHeaders("ADMIN"))
+      .send({ isActive: false });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(category);
+    expect(mocks.prisma.reportCategory.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: category.id },
+      data: { isActive: false }
+    }));
+  });
+
+  it("keeps an existing report category reference while preventing new reports with inactive categories", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    mocks.prisma.report.findUnique.mockResolvedValue(null);
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue(null);
+
+    const response = await reportSubmission()
+      .attach("photos", png, { filename: "photo.png", contentType: "image/png" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.categoryId).toBe("Kategori tidak tersedia");
+    expect(mocks.prisma.reportCategory.findFirst).toHaveBeenCalledWith({
+      where: { id: 1, isActive: true },
+      select: { id: true }
+    });
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportCategory.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate category names or slugs when updating", async () => {
+    mocks.prisma.reportCategory.findUnique.mockResolvedValue({ id: 3 });
+    mocks.prisma.reportCategory.update.mockRejectedValue({
+      code: "P2002",
+      meta: { target: ["slug"] }
+    });
+
+    const response = await request(app)
+      .patch("/api/admin/categories/3")
+      .set(mutationHeaders("ADMIN"))
+      .send({ slug: "used-slug" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.slug).toBeDefined();
+  });
+
+  it("returns 404 when updating an unknown category", async () => {
+    mocks.prisma.reportCategory.findUnique.mockResolvedValue(null);
+
+    const response = await request(app)
+      .patch("/api/admin/categories/999")
+      .set(mutationHeaders("ADMIN"))
+      .send({ isActive: false });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("NOT_FOUND");
+    expect(mocks.prisma.reportCategory.update).not.toHaveBeenCalled();
   });
 
   it("TC-20 returns the owner's complete status timeline, including rejection reasons", async () => {
