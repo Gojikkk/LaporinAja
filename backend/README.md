@@ -83,7 +83,7 @@ Frontend tersedia di **http://localhost:5173**. Untuk build produksi, jalankan `
 | Proteksi CORS, CSRF, rate limit, Origin check | ✅ Siap |
 | Data demo (3 akun + 18 laporan beragam status) | ✅ Siap |
 | Dokumentasi API (Swagger UI) | ✅ Siap |
-| Penandaan laporan duplikat (FR-019) | 🔄 Should |
+| Penandaan laporan duplikat dan tautan laporan utama (FR-019) | ✅ Siap |
 | Pencarian kata kunci (FR-020) | 🔄 Should |
 | Notifikasi dalam aplikasi (FR-021) | 🔄 Should |
 | Peta lokasi laporan (FR-022) | 🔄 Could |
@@ -384,7 +384,7 @@ GET    /api/auth/me
 
 The `PELAPOR` endpoints under `/api/me/reports` return only the signed-in user's reports. The list supports `page`, `limit`, and `status` filters; its `counts` summarize all six statuses for that user. The detail endpoint includes the full status timeline and rejection reasons. Unknown report codes and reports owned by another user both return the same `404 NOT_FOUND` response.
 
-Status changes use `expectedStatus` to prevent stale updates. The MVP allows `SUBMITTED → VERIFIED/REJECTED`, `VERIFIED → IN_PROGRESS/REJECTED`, `REJECTED → SUBMITTED` (with a correction reason), and `IN_PROGRESS → RESOLVED` when resolution evidence requirements are met. Rejection and correction reasons must be at least 10 characters. Status and history are written in one transaction; status history has no edit/delete endpoint. `DUPLICATE` transitions and reopening `RESOLVED` are not included.
+Status changes use `expectedStatus` to prevent stale updates. Transitions include `SUBMITTED → VERIFIED/REJECTED/DUPLICATE`, `VERIFIED → IN_PROGRESS/REJECTED/DUPLICATE`, `REJECTED → SUBMITTED` (with a correction reason), and `IN_PROGRESS → RESOLVED` when resolution evidence requirements are met. Rejection and correction reasons must be at least 10 characters. A `DUPLICATE` transition requires a `duplicateOfCode` targeting a different report in `VERIFIED`, `IN_PROGRESS`, or `RESOLVED`; the target reference and status history are saved atomically with the actor from the session. Public report details expose only the primary report code and `/laporan/:code` link, not private reporter identity. If the primary report later becomes `REJECTED`, behavior remains open under OQ-06 and no automatic change is made. Status history has no edit/delete endpoint; reopening `RESOLVED` is not included.
 
 ---
 

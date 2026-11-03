@@ -138,6 +138,15 @@ const components = {
             description:    { type: "string" },
             city:           { type: "string", example: "Jakarta Pusat" },
             locationDetail: { type: "string" },
+            duplicateOf: {
+              type: "object",
+              nullable: true,
+              description: "Referensi laporan utama untuk laporan berstatus DUPLICATE; tidak berisi identitas pribadi.",
+              properties: {
+                code: { type: "string", example: "LPR-2026-000002" },
+                url: { type: "string", example: "/laporan/LPR-2026-000002" },
+              },
+            },
             photos: {
               type: "array",
               items: {
@@ -865,11 +874,15 @@ const paths: Record<string, any> = {
         "Mengubah status laporan dengan optimistic locking via `expectedStatus`.\n\n" +
         "**Transisi yang diizinkan:**\n" +
         "- `SUBMITTED` → `VERIFIED` atau `REJECTED`\n" +
-        "- `VERIFIED` → `IN_PROGRESS` atau `REJECTED`\n" +
+        "- `SUBMITTED` → `DUPLICATE` dengan `duplicateOfCode` valid\n" +
+        "- `VERIFIED` → `IN_PROGRESS`, `REJECTED`, atau `DUPLICATE` dengan `duplicateOfCode` valid\n" +
         "- `IN_PROGRESS` → `RESOLVED`\n" +
         "- `REJECTED` → `SUBMITTED`\n\n" +
         "Alasan minimal 10 karakter wajib untuk penolakan dan koreksi dari `REJECTED` ke `SUBMITTED`. " +
-        "Status `DUPLICATE` dan pembukaan kembali `RESOLVED` belum termasuk MVP.\n\n" +
+        "Target duplikat harus berstatus `VERIFIED`, `IN_PROGRESS`, atau `RESOLVED`, dan bukan laporan itu sendiri. " +
+        "Detail publik laporan duplikat berisi tautan laporan utama tanpa identitas pribadi. " +
+        "Jika laporan utama kemudian `REJECTED`, perilakunya belum diputuskan (OQ-06); sistem tidak mengubah relasi otomatis.\n\n" +
+        "Pembukaan kembali `RESOLVED` belum termasuk MVP.\n\n" +
         "Transisi ke `RESOLVED` hanya dapat dilakukan jika sudah ada catatan penyelesaian " +
         "beserta minimal satu foto bukti atau penjelasan tertulis minimal 30 karakter.",
       security: [{ cookieAuth: [] }],
@@ -885,9 +898,10 @@ const paths: Record<string, any> = {
               type: "object",
               required: ["toStatus", "expectedStatus"],
               properties: {
-                toStatus:       { $ref: "#/components/schemas/ReportStatus", description: "Status baru yang diinginkan" },
+                toStatus:       { $ref: "#/components/schemas/ReportStatus", description: "Status baru; DUPLICATE hanya dari SUBMITTED/VERIFIED" },
                 expectedStatus: { $ref: "#/components/schemas/ReportStatus", description: "Status saat ini yang diharapkan (optimistic lock)" },
                 reason:         { type: "string", minLength: 10, example: "Laporan tidak sesuai cakupan platform ini.", description: "Wajib minimal 10 karakter untuk penolakan atau koreksi dari REJECTED ke SUBMITTED" },
+                duplicateOfCode: { type: "string", pattern: "^LPR-\\d{4}-\\d{6,}$", example: "LPR-2026-000002", description: "Wajib saat toStatus=DUPLICATE; target harus VERIFIED, IN_PROGRESS, atau RESOLVED dan bukan laporan ini" },
               },
             },
           },

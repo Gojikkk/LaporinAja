@@ -38,10 +38,12 @@ export type StatusChangeInput = {
   toStatus: ReportStatus;
   expectedStatus: ReportStatus;
   reason?: string;
+  duplicateOfCode?: string;
 };
 
 const publicDetailInclude = {
   category: true,
+  duplicateOf: { select: { publicCode: true } },
   evidences: { orderBy: { createdAt: "asc" as const } },
   statusHistories: { orderBy: { createdAt: "asc" as const } },
   followUps: { orderBy: { createdAt: "asc" as const }, include: { evidences: true } }
@@ -99,6 +101,12 @@ function publicReportDto(report: PublicDetail, detail = false) {
     village: report.village,
     status: report.status,
     thumbnailUrl: photos[0]?.url ?? null,
+    duplicateOf: report.duplicateOf
+      ? {
+          code: report.duplicateOf.publicCode,
+          url: `/laporan/${report.duplicateOf.publicCode}`
+        }
+      : null,
     createdAt: report.createdAt.toISOString()
   };
   if (!detail) return dto;
@@ -471,13 +479,20 @@ export async function changeReportStatus(
   }
 
   const allowed: Partial<Record<ReportStatus, ReportStatus[]>> = {
-    SUBMITTED: ["VERIFIED", "REJECTED"],
-    VERIFIED: ["IN_PROGRESS", "REJECTED"],
+    SUBMITTED: ["VERIFIED", "REJECTED", "DUPLICATE"],
+    VERIFIED: ["IN_PROGRESS", "REJECTED", "DUPLICATE"],
     IN_PROGRESS: ["RESOLVED"],
     REJECTED: ["SUBMITTED"]
   };
   if (!allowed[report.status]?.includes(body.toStatus)) {
     throw new HttpError(422, "INVALID_TRANSITION", "Perubahan status tidak diizinkan");
+  }
+  if ((body.toStatus === "DUPLICATE") !== Boolean(body.duplicateOfCode)) {
+    throw new HttpError(422, "VALIDATION_ERROR", "Data tidak valid", {
+      duplicateOfCode: body.toStatus === "DUPLICATE"
+        ? "Kode laporan utama wajib diisi"
+        : "Kode laporan utama hanya dapat diisi saat status menjadi DUPLICATE"
+    });
   }
   if ((body.toStatus === "REJECTED" || report.status === "REJECTED") &&
       (body.reason?.length ?? 0) < 10) {
@@ -494,6 +509,31 @@ export async function changeReportStatus(
     if (!lockedReport) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
     if (lockedReport.status !== body.expectedStatus) {
       throw new HttpError(409, "STATUS_CONFLICT", "Status laporan sudah berubah");
+    }
+
+    let duplicateOfReportId: string | undefined;
+    if (body.toStatus === "DUPLICATE") {
+      const duplicateOfCode = body.duplicateOfCode;
+      if (!duplicateOfCode) {
+        throw new HttpError(422, "VALIDATION_ERROR", "Data tidak valid", {
+          duplicateOfCode: "Kode laporan utama wajib diisi"
+        });
+      }
+      const duplicateTargets = await tx.$queryRaw<Array<{ id: string; status: ReportStatus }>>`
+        SELECT id, status::text AS status
+        FROM reports
+        WHERE public_code = ${duplicateOfCode}
+        FOR SHARE
+      `;
+      const duplicateTarget = duplicateTargets[0];
+      if (!duplicateTarget ||
+          duplicateTarget.id === report.id ||
+          !["VERIFIED", "IN_PROGRESS", "RESOLVED"].includes(duplicateTarget.status)) {
+        throw new HttpError(422, "VALIDATION_ERROR", "Data tidak valid", {
+          duplicateOfCode: "Pilih laporan utama berstatus VERIFIED, IN_PROGRESS, atau RESOLVED yang berbeda dari laporan ini"
+        });
+      }
+      duplicateOfReportId = duplicateTarget.id;
     }
 
     if (body.toStatus === "RESOLVED") {
@@ -521,6 +561,7 @@ export async function changeReportStatus(
       where: { id: report.id, status: body.expectedStatus },
       data: {
         status: body.toStatus,
+        ...(duplicateOfReportId ? { duplicateOfReportId } : {}),
         ...(body.toStatus === "VERIFIED" ? { verifiedAt: new Date() } : {}),
         ...(body.toStatus === "RESOLVED" ? { resolvedAt: new Date() } : {})
       }
