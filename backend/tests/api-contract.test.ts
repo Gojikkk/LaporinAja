@@ -754,6 +754,124 @@ describe("report and privacy contract", () => {
     expect(mocks.prisma.reportFollowUp.create).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["VERIFIED", 10],
+    ["VERIFIED", 500],
+    ["IN_PROGRESS", 10],
+    ["IN_PROGRESS", 500]
+  ])("TC-21 appends a %s follow-up note of %i characters", async (status, length) => {
+    const note = "x".repeat(length);
+    const followUpId = "5ea3cd77-8123-4702-94ea-1f8a1e480ad1";
+    const createdAt = new Date("2026-10-26T00:00:00.000Z");
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status }]);
+    mocks.prisma.reportFollowUp.create.mockResolvedValue({
+      id: followUpId,
+      note,
+      createdAt
+    });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/follow-ups")
+      .set(mutationHeaders("ADMIN"))
+      .field("note", note)
+      .field("isResolutionNote", "false");
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual({
+      id: followUpId,
+      note,
+      createdAt: createdAt.toISOString()
+    });
+    expect(mocks.prisma.reportFollowUp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        reportId: reportData.id,
+        createdBy: user.id,
+        note,
+        isResolutionNote: false
+      })
+    }));
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("TC-21 does not expose follow-up note edit or delete operations", async () => {
+    const followUpId = "5ea3cd77-8123-4702-94ea-1f8a1e480ad1";
+    const url = `/api/admin/reports/LPR-2026-000001/follow-ups/${followUpId}`;
+
+    const [edit, remove] = await Promise.all([
+      request(app).put(url).set(mutationHeaders("ADMIN")).send({ note: "Catatan koreksi terbaru" }),
+      request(app).delete(url).set(mutationHeaders("ADMIN"))
+    ]);
+
+    expect(edit.status).toBe(404);
+    expect(remove.status).toBe(404);
+    expect(mocks.prisma.reportFollowUp.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["shorter than 10 characters", "123456789"],
+    ["longer than 500 characters", "x".repeat(501)]
+  ])("TC-21 rejects a follow-up note %s", async (_label, note) => {
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/follow-ups")
+      .set(mutationHeaders("ADMIN"))
+      .field("note", note)
+      .field("isResolutionNote", "false");
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(mocks.prisma.report.findUnique).not.toHaveBeenCalled();
+  });
+
+  it.each(["SUBMITTED", "RESOLVED"])("TC-21 rejects follow-up notes in %s status", async (status) => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/follow-ups")
+      .set(mutationHeaders("ADMIN"))
+      .field("note", "Catatan perbaikan baru")
+      .field("isResolutionNote", "false");
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("INVALID_TRANSITION");
+    expect(mocks.prisma.reportFollowUp.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("TC-22 leaves a report unresolved when proof upload fails", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    mocks.prisma.report.findUnique
+      .mockResolvedValueOnce({ id: reportData.id, status: "IN_PROGRESS" })
+      .mockResolvedValueOnce({ id: reportData.id, status: "IN_PROGRESS" });
+    mocks.cloudinary.uploader.upload_stream.mockImplementationOnce((_options, callback) => ({
+      end: () => callback(new Error("Cloudinary unavailable"), undefined)
+    }));
+
+    const upload = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/follow-ups")
+      .set(mutationHeaders("ADMIN"))
+      .field("note", "Perbaikan telah selesai dilakukan")
+      .field("isResolutionNote", "true")
+      .attach("photos", png, { filename: "proof.png", contentType: "image/png" });
+
+    expect(upload.status).toBe(502);
+    expect(upload.body.error.code).toBe("UPLOAD_FAILED");
+    expect(mocks.prisma.reportFollowUp.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "IN_PROGRESS" }]);
+    const resolve = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus: "RESOLVED", expectedStatus: "IN_PROGRESS" });
+
+    expect(resolve.status).toBe(422);
+    expect(resolve.body.error.code).toBe("VALIDATION_ERROR");
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+  });
+
   it("returns public statistics with enum counts and a zero-safe completion percentage", async () => {
     mocks.prisma.report.count.mockResolvedValue(0);
     mocks.prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
@@ -809,7 +927,7 @@ describe("report and privacy contract", () => {
   it.each([
     ["with photo evidence", true],
     ["with a text explanation", false]
-  ])("supports resolving a report %s", async (_label, withPhoto) => {
+  ])("TC-22 supports resolving a report %s", async (_label, withPhoto) => {
     const png = await sharp({
       create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
     }).png().toBuffer();
