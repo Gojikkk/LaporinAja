@@ -8,6 +8,7 @@ const statusSchema = z.enum(["SUBMITTED", "VERIFIED", "IN_PROGRESS", "RESOLVED",
 const publicStatusSchema = z.enum(reportService.publicStatusValues);
 
 const publicReportFiltersSchema = z.object({
+  q: z.string().trim().min(1, "Kata kunci tidak boleh kosong").max(100, "Kata kunci maksimal 100 karakter").optional(),
   category: z.string().trim().min(1).optional(),
   status: publicStatusSchema.optional(),
   district: z.string().trim().min(1).optional(),

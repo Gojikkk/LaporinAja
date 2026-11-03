@@ -11,6 +11,7 @@ export const publicStatuses: ReportStatus[] = [...publicStatusValues];
 const reportCodePattern = /^LPR-\d{4}-\d{6,}$/;
 
 export type PublicReportFilters = {
+  q?: string;
   category?: string;
   status?: (typeof publicStatusValues)[number];
   district?: string;
@@ -208,6 +209,18 @@ export async function listPublicReports(
   const where: Prisma.ReportWhereInput = {
     isHidden: false,
     status: { in: filters.status ? [filters.status] : publicStatuses },
+    ...(filters.q ? {
+      OR: [
+        { publicCode: { contains: filters.q, mode: "insensitive" as const } },
+        { title: { contains: filters.q, mode: "insensitive" as const } },
+        { description: { contains: filters.q, mode: "insensitive" as const } },
+        { city: { contains: filters.q, mode: "insensitive" as const } },
+        { district: { contains: filters.q, mode: "insensitive" as const } },
+        { village: { contains: filters.q, mode: "insensitive" as const } },
+        { locationDetail: { contains: filters.q, mode: "insensitive" as const } },
+        { category: { name: { contains: filters.q, mode: "insensitive" as const } } }
+      ]
+    } : {}),
     ...(filters.category ? { category: { slug: filters.category } } : {}),
     ...(filters.district ? { district: filters.district } : {}),
     ...(filters.village ? { village: filters.village } : {})
