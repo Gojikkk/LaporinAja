@@ -867,7 +867,9 @@ const paths: Record<string, any> = {
         "- `SUBMITTED` → `VERIFIED` atau `REJECTED`\n" +
         "- `VERIFIED` → `IN_PROGRESS` atau `REJECTED`\n" +
         "- `IN_PROGRESS` → `RESOLVED`\n" +
-        "- `REJECTED` → `SUBMITTED`",
+        "- `REJECTED` → `SUBMITTED`\n\n" +
+        "Transisi ke `RESOLVED` hanya dapat dilakukan jika sudah ada catatan penyelesaian " +
+        "beserta minimal satu foto bukti atau penjelasan tertulis minimal 30 karakter.",
       security: [{ cookieAuth: [] }],
       parameters: [
         { $ref: "#/components/parameters/ReportCodeParam" },
