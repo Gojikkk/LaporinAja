@@ -46,7 +46,23 @@ const followUpSchema = z.object({
 const statusChangeSchema = z.object({
   toStatus: statusSchema,
   expectedStatus: statusSchema,
-  reason: z.string().trim().optional()
+  reason: z.string().trim().optional(),
+  duplicateOfCode: z.string().trim().regex(/^LPR-\d{4}-\d{6,}$/, "Kode laporan tidak valid").optional()
+}).superRefine((body, context) => {
+  if (body.toStatus === "DUPLICATE" && !body.duplicateOfCode) {
+    context.addIssue({
+      code: "custom",
+      path: ["duplicateOfCode"],
+      message: "Kode laporan utama wajib diisi"
+    });
+  }
+  if (body.toStatus !== "DUPLICATE" && body.duplicateOfCode) {
+    context.addIssue({
+      code: "custom",
+      path: ["duplicateOfCode"],
+      message: "Kode laporan utama hanya dapat diisi saat status menjadi DUPLICATE"
+    });
+  }
 });
 
 function getCode(request: Request): string {

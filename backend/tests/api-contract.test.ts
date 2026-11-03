@@ -553,7 +553,12 @@ describe("report and privacy contract", () => {
     const response = await request(app)
       .post("/api/admin/reports/LPR-2026-000001/status")
       .set(mutationHeaders("ADMIN"))
-      .send({ toStatus, expectedStatus: fromStatus, reason: "Alasan transisi valid" });
+      .send({
+        toStatus,
+        expectedStatus: fromStatus,
+        reason: "Alasan transisi valid",
+        ...(toStatus === "DUPLICATE" ? { duplicateOfCode: "LPR-2026-000002" } : {})
+      });
 
     expect(response.status).toBe(422);
     expect(response.body.error.code).toBe("INVALID_TRANSITION");
@@ -651,6 +656,171 @@ describe("report and privacy contract", () => {
     expect(response.body.error.code).toBe("STATUS_CONFLICT");
     expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
     expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["SUBMITTED", "VERIFIED"],
+    ["SUBMITTED", "IN_PROGRESS"],
+    ["SUBMITTED", "RESOLVED"],
+    ["VERIFIED", "VERIFIED"],
+    ["VERIFIED", "IN_PROGRESS"],
+    ["VERIFIED", "RESOLVED"]
+  ])("FR-019 marks %s as a duplicate of a %s report atomically", async (sourceStatus, targetStatus) => {
+    const targetId = "228f42a4-4d7b-4ce0-8459-6d3b70a43002";
+    const historyId = "9ed1209d-9b25-47b6-b88b-d7d33120f481";
+    let insideTransaction = false;
+    mocks.prisma.$transaction.mockImplementationOnce(async (operation: unknown) => {
+      expect(typeof operation).toBe("function");
+      insideTransaction = true;
+      try {
+        return await (operation as (tx: typeof mocks.prisma) => unknown)(mocks.prisma);
+      } finally {
+        insideTransaction = false;
+      }
+    });
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: sourceStatus });
+    mocks.prisma.$queryRaw
+      .mockResolvedValueOnce([{ status: sourceStatus }])
+      .mockResolvedValueOnce([{ id: targetId, status: targetStatus }]);
+    mocks.prisma.report.updateMany.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { count: 1 };
+    });
+    mocks.prisma.reportStatusHistory.create.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { id: historyId };
+    });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "DUPLICATE",
+        expectedStatus: sourceStatus,
+        duplicateOfCode: "LPR-2026-000002",
+        reason: "Laporan yang sama sudah tercatat"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({
+      code: "LPR-2026-000001",
+      status: "DUPLICATE",
+      historyId
+    });
+    expect(mocks.prisma.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: reportData.id, status: sourceStatus },
+      data: expect.objectContaining({ status: "DUPLICATE", duplicateOfReportId: targetId })
+    }));
+    expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        reportId: reportData.id,
+        fromStatus: sourceStatus,
+        toStatus: "DUPLICATE",
+        changedBy: user.id,
+        reason: "Laporan yang sama sudah tercatat"
+      })
+    }));
+    expect(mocks.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it.each([
+    ["SUBMITTED", "SUBMITTED"],
+    ["SUBMITTED", "REJECTED"],
+    ["SUBMITTED", "DUPLICATE"],
+    ["SUBMITTED", "self"]
+  ])("FR-019 rejects an invalid %s duplicate target (%s)", async (sourceStatus, targetStatus) => {
+    const sourceId = reportData.id;
+    const targetId = targetStatus === "self" ? sourceId : "228f42a4-4d7b-4ce0-8459-6d3b70a43002";
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: sourceId, status: sourceStatus });
+    mocks.prisma.$queryRaw
+      .mockResolvedValueOnce([{ status: sourceStatus }])
+      .mockResolvedValueOnce(targetStatus === "self"
+        ? [{ id: targetId, status: "VERIFIED" }]
+        : [{ id: targetId, status: targetStatus }]);
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "DUPLICATE",
+        expectedStatus: sourceStatus,
+        duplicateOfCode: "LPR-2026-000002"
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(response.body.error.fields.duplicateOfCode).toBeDefined();
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it("FR-019 rejects a nonexistent primary report without changing status or history", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "VERIFIED" });
+    mocks.prisma.$queryRaw
+      .mockResolvedValueOnce([{ status: "VERIFIED" }])
+      .mockResolvedValueOnce([]);
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "DUPLICATE",
+        expectedStatus: "VERIFIED",
+        duplicateOfCode: "LPR-2026-000099"
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.duplicateOfCode).toBeDefined();
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it("FR-019 requires duplicateOfCode only when transitioning to DUPLICATE", async () => {
+    const missing = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus: "DUPLICATE", expectedStatus: "SUBMITTED" });
+    const malformed = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "DUPLICATE",
+        expectedStatus: "SUBMITTED",
+        duplicateOfCode: "not-a-report-code"
+      });
+    const unexpected = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "VERIFIED",
+        expectedStatus: "SUBMITTED",
+        duplicateOfCode: "LPR-2026-000002"
+      });
+
+    expect(missing.status).toBe(422);
+    expect(missing.body.error.fields.duplicateOfCode).toBeDefined();
+    expect(malformed.status).toBe(422);
+    expect(malformed.body.error.fields.duplicateOfCode).toBeDefined();
+    expect(unexpected.status).toBe(422);
+    expect(unexpected.body.error.fields.duplicateOfCode).toBeDefined();
+    expect(mocks.prisma.report.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("FR-019 returns 409 when expectedStatus is stale for a duplicate transition", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: "VERIFIED" });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "DUPLICATE",
+        expectedStatus: "SUBMITTED",
+        duplicateOfCode: "LPR-2026-000002"
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("STATUS_CONFLICT");
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("TC-20 does not expose status-history edit or delete endpoints", async () => {
@@ -1294,6 +1464,32 @@ describe("public report catalog (LAP-9)", () => {
     expect(payload).not.toContain("private@example.test");
     expect(payload).not.toContain("private rejection");
     expect(payload).not.toContain("private correction");
+  });
+
+  it("FR-019 exposes only a primary report link on public duplicate details", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue({
+      ...reportData,
+      status: "DUPLICATE",
+      duplicateOf: { publicCode: "LPR-2026-000002" },
+      reporter: { name: "Private Reporter", email: "private@example.test" }
+    });
+
+    const response = await request(app)
+      .get("/api/reports/LPR-2026-000001")
+      .set("Origin", frontend);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.duplicateOf).toEqual({
+      code: "LPR-2026-000002",
+      url: "/laporan/LPR-2026-000002"
+    });
+    expect(mocks.prisma.report.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        duplicateOf: { select: { publicCode: true } }
+      })
+    }));
+    expect(JSON.stringify(response.body)).not.toContain("Private Reporter");
+    expect(JSON.stringify(response.body)).not.toContain("private@example.test");
   });
 
   it("TC-26 returns the same 404 for unknown, malformed, and non-public report codes", async () => {
