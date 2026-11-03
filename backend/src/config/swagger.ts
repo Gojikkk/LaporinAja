@@ -868,6 +868,8 @@ const paths: Record<string, any> = {
         "- `VERIFIED` → `IN_PROGRESS` atau `REJECTED`\n" +
         "- `IN_PROGRESS` → `RESOLVED`\n" +
         "- `REJECTED` → `SUBMITTED`\n\n" +
+        "Alasan minimal 10 karakter wajib untuk penolakan dan koreksi dari `REJECTED` ke `SUBMITTED`. " +
+        "Status `DUPLICATE` dan pembukaan kembali `RESOLVED` belum termasuk MVP.\n\n" +
         "Transisi ke `RESOLVED` hanya dapat dilakukan jika sudah ada catatan penyelesaian " +
         "beserta minimal satu foto bukti atau penjelasan tertulis minimal 30 karakter.",
       security: [{ cookieAuth: [] }],
@@ -885,7 +887,7 @@ const paths: Record<string, any> = {
               properties: {
                 toStatus:       { $ref: "#/components/schemas/ReportStatus", description: "Status baru yang diinginkan" },
                 expectedStatus: { $ref: "#/components/schemas/ReportStatus", description: "Status saat ini yang diharapkan (optimistic lock)" },
-                reason:         { type: "string", minLength: 10, example: "Laporan tidak sesuai cakupan platform ini.", description: "Wajib min 10 karakter jika toStatus atau expectedStatus adalah REJECTED" },
+                reason:         { type: "string", minLength: 10, example: "Laporan tidak sesuai cakupan platform ini.", description: "Wajib minimal 10 karakter untuk penolakan atau koreksi dari REJECTED ke SUBMITTED" },
               },
             },
           },

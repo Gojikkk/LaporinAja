@@ -384,6 +384,8 @@ GET    /api/auth/me
 
 The `PELAPOR` endpoints under `/api/me/reports` return only the signed-in user's reports. The list supports `page`, `limit`, and `status` filters; its `counts` summarize all six statuses for that user. The detail endpoint includes the full status timeline and rejection reasons. Unknown report codes and reports owned by another user both return the same `404 NOT_FOUND` response.
 
+Status changes use `expectedStatus` to prevent stale updates. The MVP allows `SUBMITTED → VERIFIED/REJECTED`, `VERIFIED → IN_PROGRESS/REJECTED`, `REJECTED → SUBMITTED` (with a correction reason), and `IN_PROGRESS → RESOLVED` when resolution evidence requirements are met. Rejection and correction reasons must be at least 10 characters. Status and history are written in one transaction; status history has no edit/delete endpoint. `DUPLICATE` transitions and reopening `RESOLVED` are not included.
+
 ---
 
 ## Project structure
