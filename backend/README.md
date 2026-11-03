@@ -352,6 +352,7 @@ fetch("http://localhost:3000/api/auth/google", {
 | Admin categories | `/api/admin/categories` | ADMIN |
 | Public reports | `/api/reports` | No |
 | My reports | `/api/me/reports` | PELAPOR |
+| My notifications | `/api/me/notifications` | PELAPOR |
 | Admin reports | `/api/admin/reports` | ADMIN |
 | Public stats | `/api/stats/public` | No |
 | Admin stats | `/api/admin/stats` | ADMIN |
@@ -370,6 +371,8 @@ GET    /api/reports/:code
 POST   /api/reports                    multipart/form-data, PELAPOR + CSRF
 GET    /api/me/reports                 ?status=
 GET    /api/me/reports/:code
+GET    /api/me/notifications
+PATCH  /api/me/notifications/:id/read  PELAPOR + CSRF
 
 GET    /api/admin/reports              ?status=&category=
 GET    /api/admin/reports/:code
@@ -387,6 +390,8 @@ GET    /api/auth/me
 ```
 
 The `PELAPOR` endpoints under `/api/me/reports` return only the signed-in user's reports. The list supports `page`, `limit`, and `status` filters; its `counts` summarize all six statuses for that user. The detail endpoint includes the full status timeline and rejection reasons. Unknown report codes and reports owned by another user both return the same `404 NOT_FOUND` response.
+
+Status changes create a safe `REPORT_STATUS_CHANGED` notification for the report owner in the same transaction as the report status and history. `GET /api/me/notifications` lists only the current pelapor's notifications with read state; `PATCH /api/me/notifications/:id/read` marks an owned notification as read and returns 404 for another user's notification. The notification message does not include private moderation reasons.
 
 Category management is restricted to administrators. Names must contain 3–60 characters and names/slugs are unique. Use `PATCH /api/admin/categories/:id` with `{ "isActive": false }` to deactivate a category; categories are never removed, preserving references from existing reports. Inactive categories disappear from the public category list and cannot be selected for new reports.
 

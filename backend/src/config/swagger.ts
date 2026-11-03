@@ -85,6 +85,19 @@ const components = {
         },
       ],
     },
+    Notification: {
+      type: "object",
+      properties: {
+        id: { type: "string", format: "uuid" },
+        type: { type: "string", example: "REPORT_STATUS_CHANGED" },
+        message: { type: "string", example: "Laporan Anda telah diverifikasi." },
+        isRead: { type: "boolean", example: false },
+        createdAt: { type: "string", format: "date-time" },
+        reportCode: { type: "string", example: "LPR-2026-000001" },
+        reportUrl: { type: "string", example: "/laporan/LPR-2026-000001" },
+      },
+      required: ["id", "type", "message", "isRead", "createdAt", "reportCode", "reportUrl"],
+    },
     ReportListItem: {
       type: "object",
       properties: {
@@ -857,6 +870,62 @@ const paths: Record<string, any> = {
           content: {
             "application/json": {
               schema: { type: "object", properties: { data: { $ref: "#/components/schemas/ReportDetailOwner" } } },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "404": { $ref: "#/components/responses/404" },
+      },
+    },
+  },
+
+  "/api/me/notifications": {
+    get: {
+      tags: ["My Notifications"],
+      summary: "Daftar notifikasi milik pelapor",
+      description: "Hanya menampilkan notifikasi milik sesi yang sedang login.",
+      security: [{ cookieAuth: [] }],
+      responses: {
+        "200": {
+          description: "Daftar notifikasi terbaru",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: { type: "array", items: { $ref: "#/components/schemas/Notification" } },
+                },
+              },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+      },
+    },
+  },
+  "/api/me/notifications/{id}/read": {
+    patch: {
+      tags: ["My Notifications"],
+      summary: "Tandai notifikasi sebagai dibaca",
+      description: "Hanya dapat mengubah notifikasi milik pelapor yang sedang login. Pemilik lain menerima 404.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        },
+        { $ref: "#/components/parameters/CsrfHeader" },
+      ],
+      responses: {
+        "200": {
+          description: "Notifikasi ditandai dibaca",
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { data: { $ref: "#/components/schemas/Notification" } } },
             },
           },
         },

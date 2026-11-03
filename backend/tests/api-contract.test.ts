@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
       reportStatusHistory: model(["create", "findMany"]),
       reportFollowUp: model(["create", "findFirst", "findMany"]),
       reportEvidence: model(["create", "createMany", "findUnique", "findMany"]),
+      notification: model(["create", "findMany", "findFirst", "updateMany"]),
       $transaction: fn(),
       $queryRaw: fn(),
       $executeRaw: fn()
@@ -117,6 +118,7 @@ const reportData = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.prisma.notification.create.mockReset();
   mocks.cloudinary.uploader.upload_stream.mockImplementation((options, callback) => ({
     end: (buffer: Buffer) => {
       const publicId = `${options.folder}/${options.public_id}`;
@@ -399,6 +401,172 @@ describe("report and privacy contract", () => {
     expect(unauthenticated.status).toBe(401);
     expect(reporter.status).toBe(403);
     expect(mocks.prisma.reportCategory.findMany).not.toHaveBeenCalled();
+  });
+
+  it("lists notifications only for the signed-in reporter", async () => {
+    const notifications = [{
+      id: "92222222-2222-4222-8222-222222222222",
+      userId: user.id,
+      reportId: reportData.id,
+      type: "REPORT_STATUS_CHANGED",
+      message: "Laporan Anda telah diverifikasi.",
+      isRead: false,
+      createdAt: new Date("2026-11-03T00:00:00.000Z"),
+      report: { publicCode: reportData.publicCode }
+    }];
+    mocks.prisma.notification.findMany.mockResolvedValue(notifications);
+
+    const response = await request(app)
+      .get("/api/me/notifications")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie("PELAPOR"));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([{
+      id: notifications[0].id,
+      type: notifications[0].type,
+      message: notifications[0].message,
+      isRead: false,
+      createdAt: notifications[0].createdAt.toISOString(),
+      reportCode: reportData.publicCode,
+      reportUrl: `/laporan/${reportData.publicCode}`
+    }]);
+    expect(mocks.prisma.notification.findMany).toHaveBeenCalledWith({
+      where: { userId: user.id },
+      include: { report: { select: { publicCode: true } } },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(JSON.stringify(response.body)).not.toContain("email");
+  });
+
+  it("marks only the owner's notification as read", async () => {
+    const notificationId = "92222222-2222-4222-8222-222222222222";
+    const notification = {
+      id: notificationId,
+      userId: user.id,
+      reportId: reportData.id,
+      type: "REPORT_STATUS_CHANGED",
+      message: "Laporan Anda telah diverifikasi.",
+      isRead: true,
+      createdAt: new Date("2026-11-03T00:00:00.000Z"),
+      report: { publicCode: reportData.publicCode }
+    };
+    mocks.prisma.notification.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.notification.findFirst.mockResolvedValue(notification);
+
+    const response = await request(app)
+      .patch(`/api/me/notifications/${notificationId}/read`)
+      .set(mutationHeaders("PELAPOR"));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      id: notificationId,
+      isRead: true,
+      reportCode: reportData.publicCode,
+      reportUrl: `/laporan/${reportData.publicCode}`
+    });
+    expect(mocks.prisma.notification.updateMany).toHaveBeenCalledWith({
+      where: { id: notificationId, userId: user.id },
+      data: { isRead: true }
+    });
+    expect(mocks.prisma.notification.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: notificationId, userId: user.id }
+    }));
+    expect(mocks.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it("does not reveal notifications owned by another user", async () => {
+    const notificationId = "92222222-2222-4222-8222-222222222222";
+    mocks.prisma.notification.updateMany.mockResolvedValue({ count: 0 });
+    mocks.prisma.notification.findFirst.mockResolvedValue(null);
+
+    const response = await request(app)
+      .patch(`/api/me/notifications/${notificationId}/read`)
+      .set(mutationHeaders("PELAPOR"));
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toEqual({
+      code: "NOT_FOUND",
+      message: "Notifikasi tidak ditemukan"
+    });
+    expect(mocks.prisma.notification.updateMany).toHaveBeenCalledWith({
+      where: { id: notificationId, userId: user.id },
+      data: { isRead: true }
+    });
+  });
+
+  it("creates a safe status notification inside the status transaction", async () => {
+    let insideTransaction = false;
+    mocks.prisma.$transaction.mockImplementationOnce(async (operation: unknown) => {
+      expect(typeof operation).toBe("function");
+      insideTransaction = true;
+      try {
+        return await (operation as (tx: typeof mocks.prisma) => unknown)(mocks.prisma);
+      } finally {
+        insideTransaction = false;
+      }
+    });
+    mocks.prisma.report.findUnique.mockResolvedValue({
+      id: reportData.id,
+      status: "SUBMITTED",
+      reporterId: user.id
+    });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "SUBMITTED" }]);
+    mocks.prisma.report.updateMany.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { count: 1 };
+    });
+    mocks.prisma.reportStatusHistory.create.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { id: "history-id" };
+    });
+    mocks.prisma.notification.create.mockImplementation(async (args) => {
+      expect(insideTransaction).toBe(true);
+      return args.data;
+    });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "REJECTED",
+        expectedStatus: "SUBMITTED",
+        reason: "Private internal moderation detail"
+      });
+
+    expect(response.status).toBe(200);
+    expect(mocks.prisma.notification.create).toHaveBeenCalledWith({
+      data: {
+        userId: user.id,
+        reportId: reportData.id,
+        type: "REPORT_STATUS_CHANGED",
+        message: "Laporan Anda ditolak. Silakan periksa detail laporan untuk informasi lebih lanjut."
+      }
+    });
+    expect(JSON.stringify(mocks.prisma.notification.create.mock.calls[0])).not.toContain("Private internal");
+  });
+
+  it("aborts the status transaction when its notification cannot be created", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({
+      id: reportData.id,
+      status: "SUBMITTED",
+      reporterId: user.id
+    });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "SUBMITTED" }]);
+    mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportStatusHistory.create.mockResolvedValue({ id: "history-id" });
+    mocks.prisma.notification.create.mockRejectedValue(new Error("Notification write failed"));
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({ toStatus: "VERIFIED", expectedStatus: "SUBMITTED" });
+
+    expect(response.status).toBe(500);
+    expect(mocks.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(mocks.prisma.report.updateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledTimes(1);
+    expect(mocks.prisma.notification.create).toHaveBeenCalledTimes(1);
   });
 
   it("lists active and inactive categories for administrators", async () => {
