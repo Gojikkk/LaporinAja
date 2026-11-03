@@ -75,6 +75,16 @@ const components = {
       },
       required: ["id", "name", "slug"],
     },
+    AdminCategory: {
+      allOf: [
+        { $ref: "#/components/schemas/Category" },
+        {
+          type: "object",
+          properties: { isActive: { type: "boolean", example: true } },
+          required: ["isActive"],
+        },
+      ],
+    },
     ReportListItem: {
       type: "object",
       properties: {
@@ -530,6 +540,114 @@ const paths: Record<string, any> = {
             },
           },
         },
+      },
+    },
+  },
+
+  "/api/admin/categories": {
+    get: {
+      tags: ["Admin Categories"],
+      summary: "Daftar semua kategori",
+      description: "Hanya ADMIN. Menampilkan kategori aktif dan nonaktif.",
+      security: [{ cookieAuth: [] }],
+      responses: {
+        "200": {
+          description: "Daftar kategori",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { data: { type: "array", items: { $ref: "#/components/schemas/AdminCategory" } } },
+              },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+      },
+    },
+    post: {
+      tags: ["Admin Categories"],
+      summary: "Buat kategori",
+      description: "Hanya ADMIN. Nama 3–60 karakter; nama dan slug harus unik.",
+      security: [{ cookieAuth: [] }],
+      parameters: [{ $ref: "#/components/parameters/CsrfHeader" }],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["name", "slug"],
+              properties: {
+                name: { type: "string", minLength: 3, maxLength: 60 },
+                slug: { type: "string", minLength: 3, maxLength: 60, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                isActive: { type: "boolean", default: true },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        "201": {
+          description: "Kategori berhasil dibuat",
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { data: { $ref: "#/components/schemas/AdminCategory" } } },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "422": { $ref: "#/components/responses/422" },
+      },
+    },
+  },
+  "/api/admin/categories/{id}": {
+    patch: {
+      tags: ["Admin Categories"],
+      summary: "Perbarui atau nonaktifkan kategori",
+      description:
+        "Hanya ADMIN. Minimal satu field dikirim. Gunakan `isActive=false` untuk menonaktifkan kategori; kategori yang dipakai laporan lama tidak dihapus.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "integer", minimum: 1 },
+        },
+        { $ref: "#/components/parameters/CsrfHeader" },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              minProperties: 1,
+              properties: {
+                name: { type: "string", minLength: 3, maxLength: 60 },
+                slug: { type: "string", minLength: 3, maxLength: 60, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                isActive: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Kategori berhasil diperbarui",
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { data: { $ref: "#/components/schemas/AdminCategory" } } },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "404": { $ref: "#/components/responses/404" },
+        "422": { $ref: "#/components/responses/422" },
       },
     },
   },

@@ -349,6 +349,7 @@ fetch("http://localhost:3000/api/auth/google", {
 | Health | `/health` | No |
 | Auth | `/api/auth` | Varies |
 | Categories | `/api/categories` | No |
+| Admin categories | `/api/admin/categories` | ADMIN |
 | Public reports | `/api/reports` | No |
 | My reports | `/api/me/reports` | PELAPOR |
 | Admin reports | `/api/admin/reports` | ADMIN |
@@ -360,6 +361,9 @@ fetch("http://localhost:3000/api/auth/google", {
 
 ```
 GET    /api/categories
+GET    /api/admin/categories            ADMIN
+POST   /api/admin/categories            JSON, ADMIN + CSRF
+PATCH  /api/admin/categories/:id        JSON, ADMIN + CSRF
 GET    /api/reports                    ?category=&status=&district=&village=&page=&limit=
 GET    /api/reports/:code
 
@@ -383,6 +387,8 @@ GET    /api/auth/me
 ```
 
 The `PELAPOR` endpoints under `/api/me/reports` return only the signed-in user's reports. The list supports `page`, `limit`, and `status` filters; its `counts` summarize all six statuses for that user. The detail endpoint includes the full status timeline and rejection reasons. Unknown report codes and reports owned by another user both return the same `404 NOT_FOUND` response.
+
+Category management is restricted to administrators. Names must contain 3–60 characters and names/slugs are unique. Use `PATCH /api/admin/categories/:id` with `{ "isActive": false }` to deactivate a category; categories are never removed, preserving references from existing reports. Inactive categories disappear from the public category list and cannot be selected for new reports.
 
 Status changes use `expectedStatus` to prevent stale updates. Transitions include `SUBMITTED → VERIFIED/REJECTED/DUPLICATE`, `VERIFIED → IN_PROGRESS/REJECTED/DUPLICATE`, `REJECTED → SUBMITTED` (with a correction reason), and `IN_PROGRESS → RESOLVED` when resolution evidence requirements are met. Rejection and correction reasons must be at least 10 characters. A `DUPLICATE` transition requires a `duplicateOfCode` targeting a different report in `VERIFIED`, `IN_PROGRESS`, or `RESOLVED`; the target reference and status history are saved atomically with the actor from the session. Public report details expose only the primary report code and `/laporan/:code` link, not private reporter identity. If the primary report later becomes `REJECTED`, behavior remains open under OQ-06 and no automatic change is made. Status history has no edit/delete endpoint; reopening `RESOLVED` is not included.
 
