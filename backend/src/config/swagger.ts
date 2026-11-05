@@ -106,6 +106,8 @@ const components = {
         category:     { $ref: "#/components/schemas/Category" },
         district:     { type: "string", example: "Menteng" },
         village:      { type: "string", example: "Menteng" },
+        latitude:     { type: "number", nullable: true, example: -6.175, description: "Koordinat publik dibulatkan hingga 3 angka desimal" },
+        longitude:    { type: "number", nullable: true, example: 106.827, description: "Koordinat publik dibulatkan hingga 3 angka desimal" },
         status:       { $ref: "#/components/schemas/ReportStatus" },
         thumbnailUrl: { type: "string", nullable: true, example: "/api/media/uuid?expires=...&signature=..." },
         createdAt:    { type: "string", format: "date-time" },
@@ -161,6 +163,8 @@ const components = {
             description:    { type: "string" },
             city:           { type: "string", example: "Jakarta Pusat" },
             locationDetail: { type: "string" },
+            latitude:       { type: "number", nullable: true, example: -6.1752, description: "Koordinat lengkap, hanya untuk pemilik laporan" },
+            longitude:      { type: "number", nullable: true, example: 106.8271, description: "Koordinat lengkap, hanya untuk pemilik laporan" },
             duplicateOf: {
               type: "object",
               nullable: true,
@@ -738,6 +742,8 @@ const paths: Record<string, any> = {
                 district:       { type: "string", maxLength: 100, example: "Menteng" },
                 village:        { type: "string", maxLength: 100, example: "Menteng" },
                 locationDetail: { type: "string", minLength: 5, maxLength: 200, example: "Depan gerbang SDN 01 Menteng" },
+                latitude:       { type: "number", minimum: -90, maximum: 90, nullable: true, example: -6.1752, description: "Opsional; rentang -90 sampai 90" },
+                longitude:      { type: "number", minimum: -180, maximum: 180, nullable: true, example: 106.8271, description: "Opsional; rentang -180 sampai 180" },
                 submissionKey:  { type: "string", format: "uuid", example: "7f3e2cee-c90c-4a54-b12a-5a9c65a13590", description: "UUID v4 unik per submit. Idempotency key." },
                 photos: {
                   type: "array",
@@ -974,6 +980,36 @@ const paths: Record<string, any> = {
     },
   },
 
+  "/api/admin/reports/export": {
+    get: {
+      tags: ["Admin Reports"],
+      summary: "Ekspor laporan ke CSV (ADMIN)",
+      description:
+        "Mengunduh semua laporan yang cocok dengan filter daftar admin (`status`, `category`). " +
+        "CSV berisi koordinat presisi penuh dan hanya tersedia untuk ADMIN; email pelapor tidak disertakan.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        { $ref: "#/components/parameters/StatusFilterParam" },
+        { $ref: "#/components/parameters/CategorySlugParam" },
+      ],
+      responses: {
+        "200": {
+          description: "File CSV laporan",
+          content: { "text/csv": { schema: { type: "string", format: "binary" } } },
+          headers: {
+            "Content-Disposition": {
+              schema: { type: "string" },
+              description: "Nama file unduhan CSV"
+            }
+          }
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "400": { description: "Filter tidak valid", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } },
+      },
+    },
+  },
+
   "/api/admin/reports/{code}": {
     get: {
       tags: ["Admin Reports"],
@@ -1153,6 +1189,59 @@ const paths: Record<string, any> = {
         },
       },
     },
+  },
+
+  "/api/stats/trends": {
+    get: {
+      tags: ["Statistics"],
+      summary: "Tren laporan publik per kategori",
+      description:
+        "Jumlah laporan non-hidden dengan status publik per kategori dan bulan untuk 12 bulan kalender terakhir. " +
+        "Tidak mengembalikan koordinat, identitas, atau detail laporan; data diberi label demonstrasi.",
+      responses: {
+        "200": {
+          description: "Agregat tren bulanan per kategori",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "object",
+                    properties: {
+                      period: { type: "string", example: "last-12-calendar-months" },
+                      byCategory: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "integer" },
+                            name: { type: "string" },
+                            slug: { type: "string" },
+                            months: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  month: { type: "string", pattern: "^\\d{4}-\\d{2}$" },
+                                  count: { type: "integer" }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      asOf: { type: "string", format: "date-time" },
+                      label: { type: "string", example: "Data demonstrasi" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   },
 
   "/api/admin/stats": {

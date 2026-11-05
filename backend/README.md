@@ -86,7 +86,10 @@ Frontend tersedia di **http://localhost:5173**. Untuk build produksi, jalankan `
 | Penandaan laporan duplikat dan tautan laporan utama (FR-019) | ✅ Siap |
 | Pencarian kata kunci (FR-020) | 🔄 Should |
 | Notifikasi dalam aplikasi (FR-021) | 🔄 Should |
-| Peta lokasi laporan (FR-022) | 🔄 Could |
+| Koordinat opsional laporan dan pembulatan presisi publik (FR-022) | ✅ Should |
+| Ekspor laporan admin ke CSV (FR-025) | ✅ Could |
+| Tren laporan publik per kategori (FR-026) | ✅ Could |
+| Email notifikasi perubahan status (FR-027) | ✅ Could |
 
 ---
 
@@ -383,11 +386,13 @@ GET    /api/me/notifications
 PATCH  /api/me/notifications/:id/read  PELAPOR + CSRF
 
 GET    /api/admin/reports              ?status=&category=
+GET    /api/admin/reports/export       CSV, ADMIN, ?status=&category=
 GET    /api/admin/reports/:code
 POST   /api/admin/reports/:code/follow-ups   multipart/form-data, ADMIN + CSRF
 POST   /api/admin/reports/:code/status       JSON, ADMIN + CSRF
 
 GET    /api/stats/public
+GET    /api/stats/trends               Tren aman per kategori, 12 bulan
 GET    /api/admin/stats                ADMIN
 
 POST   /api/auth/register
@@ -405,7 +410,13 @@ Category management is restricted to administrators. Names must contain 3–60 c
 
 The public report list accepts an optional `q` query (1–100 characters, trimmed) and searches case-insensitively across report code, title, description, city, district, village, location details, and category name. It composes with the existing filters and pagination; results remain limited to public, non-hidden reports, and no matches return an empty list.
 
+Reports may include optional latitude/longitude coordinates (latitude -90..90, longitude -180..180; both must be supplied together). Public list/detail responses round coordinates to three decimal places; authenticated owner and admin endpoints retain full precision. `GET /api/admin/reports/export` exports the same database reports and `status`/`category` filters as the admin list, without pagination. It is ADMIN-only, omits reporter email, and protects CSV cells from spreadsheet formula execution.
+
+`GET /api/stats/trends` returns per-category counts of visible public-status reports by creation month for the latest 12 calendar months. It contains aggregate counts and category labels only, excludes hidden/non-public reports, and is labeled `Data demonstrasi`.
+
 Status changes use `expectedStatus` to prevent stale updates. Transitions include `SUBMITTED → VERIFIED/REJECTED/DUPLICATE`, `VERIFIED → IN_PROGRESS/REJECTED/DUPLICATE`, `REJECTED → SUBMITTED` (with a correction reason), `IN_PROGRESS → RESOLVED` when resolution evidence requirements are met, and `RESOLVED → IN_PROGRESS` to reopen within 14 days of resolution. Rejection, correction, and reopening reasons must be at least 10 characters. A `DUPLICATE` transition requires a `duplicateOfCode` targeting a different report in `VERIFIED`, `IN_PROGRESS`, or `RESOLVED`; the target reference and status history are saved atomically with the actor from the session. Reopening also writes an append-only history entry and retains existing evidence. Public report details expose only the primary report code and `/laporan/:code` link, not private reporter identity. If the primary report later becomes `REJECTED`, behavior remains open under OQ-06 and no automatic change is made. Status history has no edit/delete endpoint.
+
+Status-change emails use the configured Nodemailer SMTP transport. They are triggered after the status/notification transaction succeeds and include only safe report status information; delivery errors are logged without rolling back persisted changes.
 
 ---
 
