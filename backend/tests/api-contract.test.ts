@@ -359,7 +359,12 @@ describe("report and privacy contract", () => {
 
   it("TC-13 lists only the signed-in reporter's reports with pagination, status filter, and their status counts", async () => {
     mocks.prisma.report.count.mockResolvedValue(1);
-    mocks.prisma.report.findMany.mockResolvedValue([{ ...reportData, status: "REJECTED" }]);
+    mocks.prisma.report.findMany.mockResolvedValue([{
+      ...reportData,
+      status: "REJECTED",
+      latitude: -6.1752,
+      longitude: 106.8271
+    }]);
     mocks.prisma.$queryRaw.mockResolvedValue([
       { status: "SUBMITTED", count: 2n },
       { status: "REJECTED", count: 1n }
@@ -373,6 +378,8 @@ describe("report and privacy contract", () => {
     expect(response.status).toBe(200);
     expect(response.body.meta).toEqual({ page: 2, limit: 1, total: 1 });
     expect(response.body.data.map((report: { code: string }) => report.code)).toEqual([reportData.publicCode]);
+    expect(response.body.data[0].latitude).toBe(-6.1752);
+    expect(response.body.data[0].longitude).toBe(106.8271);
     expect(response.body.counts).toEqual({
       SUBMITTED: 2,
       VERIFIED: 0,
@@ -406,6 +413,53 @@ describe("report and privacy contract", () => {
     expect(unauthenticated.status).toBe(401);
     expect(reporter.status).toBe(403);
     expect(mocks.prisma.reportCategory.findMany).not.toHaveBeenCalled();
+  });
+
+  it("FR-025 restricts CSV report export to administrators", async () => {
+    const [unauthenticated, reporter] = await Promise.all([
+      request(app).get("/api/admin/reports/export").set("Origin", frontend),
+      request(app).get("/api/admin/reports/export")
+        .set("Origin", frontend)
+        .set("Cookie", sessionCookie("PELAPOR"))
+    ]);
+
+    expect(unauthenticated.status).toBe(401);
+    expect(reporter.status).toBe(403);
+    expect(mocks.prisma.report.findMany).not.toHaveBeenCalled();
+  });
+
+  it("FR-025 exports filtered database reports as escaped CSV without reporter email", async () => {
+    mocks.prisma.report.findMany.mockResolvedValue([{
+      publicCode: "LPR-2026-000001",
+      title: "=HYPERLINK(\"https://attacker.example\")",
+      status: "VERIFIED",
+      city: "Kota",
+      district: "Kecamatan",
+      village: "Kelurahan",
+      latitude: { toString: () => "-6.1752" },
+      longitude: { toString: () => "106.8271" },
+      createdAt: new Date("2026-11-05T00:00:00.000Z"),
+      isHidden: true,
+      category: { name: "Jalan rusak", slug: "jalan-rusak" },
+      reporter: { name: "Rani", email: "private@example.test" }
+    }]);
+
+    const response = await request(app)
+      .get("/api/admin/reports/export?status=VERIFIED&category=jalan-rusak")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie("ADMIN"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/csv");
+    expect(response.headers["content-disposition"]).toContain("laporinaja-reports.csv");
+    expect(response.text).toContain('"code","title","category","status"');
+    expect(response.text).toContain(`"'=HYPERLINK(""https://attacker.example"")"`);
+    expect(response.text).toContain('"-6.1752","106.8271"');
+    expect(response.text).not.toContain("private@example.test");
+    expect(mocks.prisma.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { status: "VERIFIED", category: { slug: "jalan-rusak" } },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }]
+    }));
   });
 
   it("lists notifications only for the signed-in reporter", async () => {
@@ -642,6 +696,19 @@ describe("report and privacy contract", () => {
     expect(mocks.prisma.reportCategory.create).not.toHaveBeenCalled();
   });
 
+  it("FR-022 requires optional latitude and longitude coordinates to be provided together", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    const response = await reportSubmission()
+      .field("latitude", "-6.1752")
+      .attach("photos", png, { filename: "photo.png", contentType: "image/png" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.longitude).toBeDefined();
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
   it.each([
     [{ code: "P2002", meta: { target: ["name"] } }, "name"],
     [{ code: "P2002", meta: { target: ["slug"] } }, "slug"]
@@ -729,6 +796,8 @@ describe("report and privacy contract", () => {
     mocks.prisma.report.findFirst.mockResolvedValue({
       ...reportData,
       status: "REJECTED",
+      latitude: -6.1752,
+      longitude: 106.8271,
       statusHistories: [{
         fromStatus: "SUBMITTED",
         toStatus: "REJECTED",
@@ -751,6 +820,8 @@ describe("report and privacy contract", () => {
       createdAt: rejectedAt.toISOString(),
       actorLabel: "Administrator platform"
     }]);
+    expect(response.body.data.latitude).toBe(-6.1752);
+    expect(response.body.data.longitude).toBe(106.8271);
     expect(mocks.prisma.report.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { publicCode: "LPR-2026-000001", reporterId: user.id }
     }));
@@ -760,6 +831,8 @@ describe("report and privacy contract", () => {
     mocks.prisma.report.findFirst.mockResolvedValue({
       ...reportData,
       status: "VERIFIED",
+      latitude: -6.1752,
+      longitude: 106.8271,
       statusHistories: [
         { fromStatus: null, toStatus: "SUBMITTED", createdAt: new Date(), reason: null },
         { fromStatus: "SUBMITTED", toStatus: "REJECTED", createdAt: new Date(), reason: "private reason" },
@@ -775,6 +848,8 @@ describe("report and privacy contract", () => {
     expect(JSON.stringify(response.body)).not.toContain(user.id);
     expect(JSON.stringify(response.body)).not.toContain("private@example.test");
     expect(JSON.stringify(response.body)).not.toContain("private reason");
+    expect(response.body.data.latitude).toBe(-6.175);
+    expect(response.body.data.longitude).toBe(106.827);
     expect(response.body.data.timeline).toHaveLength(2);
     expect(response.body.data.timeline[0].actorLabel).toBe("Administrator platform");
   });
@@ -1318,6 +1393,26 @@ describe("report and privacy contract", () => {
     expect(mocks.prisma.report.create).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["latitude", "90.1"],
+    ["latitude", "-90.1"],
+    ["longitude", "180.1"],
+    ["longitude", "-180.1"]
+  ])("FR-022 rejects out-of-range %s coordinates", async (field, value) => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    const response = await reportSubmission()
+      .field(field, value)
+      .field(field === "latitude" ? "longitude" : "latitude", "0")
+      .attach("photos", png, { filename: "photo.png", contentType: "image/png" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(response.body.error.fields[field], JSON.stringify(response.body.error)).toBeDefined();
+    expect(mocks.prisma.report.create).not.toHaveBeenCalled();
+  });
+
   it("creates a report, initial history, and image metadata as one database transaction", async () => {
     const png = await sharp({
       create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
@@ -1344,10 +1439,15 @@ describe("report and privacy contract", () => {
       .field("district", "Kecamatan")
       .field("village", "Kelurahan")
       .field("locationDetail", "Dekat taman utama")
+      .field("latitude", "-6.1752")
+      .field("longitude", "106.8271")
       .field("submissionKey", "7f3e2cee-c90c-4a54-b12a-5a9c65a13590")
       .attach("photos", png, { filename: "photo.png", contentType: "image/png" });
-    expect(response.status).toBe(201);
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
     expect(response.body.data).toEqual({ code: "LPR-2026-000021", status: "SUBMITTED" });
+    expect(mocks.prisma.report.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ latitude: -6.1752, longitude: 106.8271 })
+    }));
     expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         fromStatus: null,
@@ -1685,6 +1785,38 @@ describe("report and privacy contract", () => {
       label: "Data demonstrasi"
     });
     expect(response.body.data.asOf).toMatch(/Z$/);
+  });
+
+  it("FR-026 returns only safe public monthly category trend aggregates with a demo label", async () => {
+    mocks.prisma.$queryRaw.mockResolvedValue([
+      { id: 1, name: "Jalan rusak", slug: "jalan-rusak", month: "2025-12", count: 2n },
+      { id: 1, name: "Jalan rusak", slug: "jalan-rusak", month: "2026-01", count: 0n }
+    ]);
+
+    const response = await request(app).get("/api/stats/trends").set("Origin", frontend);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      period: "last-12-calendar-months",
+      byCategory: [{
+        id: 1,
+        name: "Jalan rusak",
+        slug: "jalan-rusak",
+        months: [
+          { month: "2025-12", count: 2 },
+          { month: "2026-01", count: 0 }
+        ]
+      }],
+      label: "Data demonstrasi"
+    });
+    const query = mocks.prisma.$queryRaw.mock.calls[0];
+    const sql = query[0].join("");
+    expect(sql).toContain("interval '11 months'");
+    expect(sql).toContain("generate_series");
+    expect(sql).toContain("r.is_hidden = false");
+    expect(sql).toContain("r.status IN");
+    expect(JSON.stringify(response.body)).not.toContain("reporter");
+    expect(JSON.stringify(response.body)).not.toContain("latitude");
   });
 
   it("calculates administrator metrics using the PRD denominators", async () => {
