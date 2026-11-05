@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
       uploader: { upload_stream: vi.fn(), destroy: vi.fn() },
       url: vi.fn()
     },
+    emailService: { sendReportStatusEmail: vi.fn() },
     prisma: {
       session: model(["create", "findUnique", "deleteMany"]),
       user: model(["create", "findUnique", "update"]),
@@ -43,6 +44,9 @@ vi.mock("google-auth-library", () => ({
   OAuth2Client: vi.fn().mockImplementation(function OAuth2Client() {
     return mocks.googleClient;
   })
+}));
+vi.mock("../src/services/email.service", () => ({
+  sendReportStatusEmail: mocks.emailService.sendReportStatusEmail
 }));
 
 import app from "../src/app";
@@ -119,6 +123,7 @@ const reportData = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.prisma.notification.create.mockReset();
+  mocks.emailService.sendReportStatusEmail.mockResolvedValue(undefined);
   mocks.cloudinary.uploader.upload_stream.mockImplementation((options, callback) => ({
     end: (buffer: Buffer) => {
       const publicId = `${options.folder}/${options.public_id}`;
@@ -509,7 +514,9 @@ describe("report and privacy contract", () => {
     mocks.prisma.report.findUnique.mockResolvedValue({
       id: reportData.id,
       status: "SUBMITTED",
-      reporterId: user.id
+      reporterId: user.id,
+      title: "Lampu jalan mati di depan sekolah",
+      reporter: { email: "rani@example.com" }
     });
     mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "SUBMITTED" }]);
     mocks.prisma.report.updateMany.mockImplementation(async () => {
@@ -523,6 +530,9 @@ describe("report and privacy contract", () => {
     mocks.prisma.notification.create.mockImplementation(async (args) => {
       expect(insideTransaction).toBe(true);
       return args.data;
+    });
+    mocks.emailService.sendReportStatusEmail.mockImplementation(async () => {
+      expect(insideTransaction).toBe(false);
     });
 
     const response = await request(app)
@@ -544,13 +554,23 @@ describe("report and privacy contract", () => {
       }
     });
     expect(JSON.stringify(mocks.prisma.notification.create.mock.calls[0])).not.toContain("Private internal");
+    expect(mocks.emailService.sendReportStatusEmail).toHaveBeenCalledWith({
+      to: "rani@example.com",
+      reportCode: "LPR-2026-000001",
+      reportTitle: "Lampu jalan mati di depan sekolah",
+      previousStatus: "SUBMITTED",
+      newStatus: "REJECTED",
+      message: "Laporan Anda ditolak. Silakan periksa detail laporan untuk informasi lebih lanjut."
+    });
   });
 
   it("aborts the status transaction when its notification cannot be created", async () => {
     mocks.prisma.report.findUnique.mockResolvedValue({
       id: reportData.id,
       status: "SUBMITTED",
-      reporterId: user.id
+      reporterId: user.id,
+      title: "Lampu jalan mati di depan sekolah",
+      reporter: { email: "rani@example.com" }
     });
     mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "SUBMITTED" }]);
     mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });

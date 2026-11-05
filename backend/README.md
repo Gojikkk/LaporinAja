@@ -186,11 +186,19 @@ Copy `.env.example` to `.env` and fill in all required values.
 | `SESSION_TTL_DAYS` | | `7` | Session lifetime in days |
 | `GOOGLE_CLIENT_ID` | | — | Required only for Google login |
 | `CLOUDINARY_FOLDER` | | `laporinaja` | Cloudinary upload folder |
+| `SMTP_HOST` | | — | Host server SMTP; dibutuhkan untuk mengaktifkan email status |
+| `SMTP_PORT` | | `587` | Port server SMTP |
+| `SMTP_SECURE` | | `false` | Gunakan koneksi TLS langsung (umumnya `true` untuk port 465) |
+| `SMTP_USER` | | — | Username SMTP; harus diisi bersama `SMTP_PASSWORD` |
+| `SMTP_PASSWORD` | | — | Password SMTP |
+| `SMTP_FROM` | | — | Alamat pengirim email, misalnya `LaporinAja <noreply@example.com>` |
 | `MAX_UPLOAD_REQUEST_BYTES` | | `20971520` | 20 MB max multipart request |
 | `POSTGRES_DB` | | `laporinaja` | Docker Compose only |
 | `POSTGRES_USER` | | `laporinaja` | Docker Compose only |
 | `POSTGRES_PASSWORD` | | `laporinaja_dev` | Docker Compose only |
 | `POSTGRES_PORT` | | `5432` | Docker Compose only |
+
+Email status laporan dikirim ke alamat pelapor setelah transaksi perubahan status berhasil. Email memuat judul dan kode laporan, status sebelum/sesudah, penjelasan status, dan tautan ke detail. Pengiriman dilakukan di luar transaksi; kegagalan email dicatat di log server dan tidak membatalkan perubahan status. SMTP belum aktif sampai variabel SMTP di atas diisi.
 
 > **Security note:** `SESSION_SECRET` must be a strong random secret and must never be committed to version control. Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
 

@@ -1,6 +1,7 @@
 ﻿import { Prisma, ReportStatus } from "@prisma/client";
 import { prisma } from "../db";
 import { generatePublicCode } from "../utils/public-code";
+import { sendReportStatusEmail } from "./email.service";
 import { HttpError } from "../utils/http-error";
 import { mediaUrl } from "../utils/media-signature";
 import { deleteStoredImages, storeImages } from "../utils/uploads";
@@ -493,7 +494,13 @@ export async function changeReportStatus(
 ) {
   const report = await prisma.report.findUnique({
     where: { publicCode: code },
-    select: { id: true, status: true, reporterId: true }
+    select: {
+      id: true,
+      status: true,
+      reporterId: true,
+      title: true,
+      reporter: { select: { email: true } }
+    }
   });
   if (!report) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
   if (report.status !== body.expectedStatus) {
@@ -609,5 +616,21 @@ export async function changeReportStatus(
     });
     return history;
   });
+  try {
+    await sendReportStatusEmail({
+      to: report.reporter.email,
+      reportCode: code,
+      reportTitle: report.title,
+      previousStatus: body.expectedStatus,
+      newStatus: body.toStatus,
+      message: statusNotificationMessages[body.toStatus]
+    });
+  } catch (error) {
+    console.error("Gagal mengirim email perubahan status laporan", {
+      reportCode: code,
+      status: body.toStatus,
+      error
+    });
+  }
   return { code, status: body.toStatus, historyId: history.id };
 }
