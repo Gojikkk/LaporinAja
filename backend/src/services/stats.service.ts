@@ -83,6 +83,57 @@ export async function getPublicStats() {
   };
 }
 
+export async function getPublicCategoryTrends() {
+  const rows = await prisma.$queryRaw<Array<{
+    id: number;
+    name: string;
+    slug: string;
+    month: string;
+    count: bigint;
+  }>>`
+    WITH months AS (
+      SELECT generate_series(
+        date_trunc('month', CURRENT_DATE) - interval '11 months',
+        date_trunc('month', CURRENT_DATE),
+        interval '1 month'
+      )::date AS month
+    )
+    SELECT c.id, c.name, c.slug, to_char(m.month, 'YYYY-MM') AS month,
+           COUNT(r.id)::bigint AS count
+    FROM report_categories c
+    CROSS JOIN months m
+    LEFT JOIN reports r
+      ON r.category_id = c.id
+      AND r.created_at >= m.month
+      AND r.created_at < m.month + interval '1 month'
+      AND r.is_hidden = false
+      AND r.status IN ('VERIFIED'::report_status, 'IN_PROGRESS'::report_status,
+                       'RESOLVED'::report_status, 'DUPLICATE'::report_status)
+    GROUP BY c.id, c.name, c.slug, m.month
+    ORDER BY c.id, m.month
+  `;
+  const categories = new Map<number, {
+    id: number;
+    name: string;
+    slug: string;
+    months: Array<{ month: string; count: number }>;
+  }>();
+  for (const row of rows) {
+    let category = categories.get(row.id);
+    if (!category) {
+      category = { id: row.id, name: row.name, slug: row.slug, months: [] };
+      categories.set(row.id, category);
+    }
+    category.months.push({ month: row.month, count: Number(row.count) });
+  }
+  return {
+    period: "last-12-calendar-months",
+    byCategory: [...categories.values()],
+    asOf: new Date().toISOString(),
+    label: "Data demonstrasi"
+  };
+}
+
 export async function getAdminStats() {
   const [
     total,

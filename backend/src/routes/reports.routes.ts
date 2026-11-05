@@ -11,9 +11,9 @@ const upload = multer({
   limits: {
     files: 3,
     fileSize: 5 * 1024 * 1024,
-    fields: 8,
+    fields: 10,
     fieldSize: 5 * 1024,
-    parts: 11
+    parts: 13
   }
 });
 
@@ -47,6 +47,12 @@ reportsRoutes.get("/me/reports", requireAuth, requireRole("PELAPOR"), reportCont
 reportsRoutes.get("/me/reports/:code", requireAuth, requireRole("PELAPOR"), reportController.getMyReport);
 
 reportsRoutes.get("/admin/reports", requireAuth, requireRole("ADMIN"), reportController.listAdminReports);
+reportsRoutes.get(
+  "/admin/reports/export",
+  requireAuth,
+  requireRole("ADMIN"),
+  reportController.exportAdminReports
+);
 reportsRoutes.get("/admin/reports/:code", requireAuth, requireRole("ADMIN"), reportController.getAdminReport);
 reportsRoutes.post(
   "/admin/reports/:code/follow-ups",

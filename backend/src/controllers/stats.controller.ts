@@ -6,6 +6,10 @@ export const getPublicStats: RequestHandler = async (_request, response) => {
   sendData(response, await statsService.getPublicStats());
 };
 
+export const getPublicCategoryTrends: RequestHandler = async (_request, response) => {
+  sendData(response, await statsService.getPublicCategoryTrends());
+};
+
 export const getAdminStats: RequestHandler = async (_request, response) => {
   sendData(response, await statsService.getAdminStats());
 };

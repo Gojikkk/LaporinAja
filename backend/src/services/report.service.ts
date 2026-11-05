@@ -36,6 +36,8 @@ export type CreateReportInput = {
   district: string;
   village: string;
   locationDetail: string;
+  latitude?: number;
+  longitude?: number;
   submissionKey: string;
 };
 
@@ -82,6 +84,12 @@ const reportListInclude = {
 } satisfies Prisma.ReportInclude;
 type ReportList = Prisma.ReportGetPayload<{ include: typeof reportListInclude }>;
 
+function roundedPublicCoordinate(value: Prisma.Decimal | number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const rounded = Number(Number(value).toFixed(3));
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
 function publicReportListDto(report: ReportList) {
   const thumbnail = report.evidences[0];
   return {
@@ -90,9 +98,19 @@ function publicReportListDto(report: ReportList) {
     category: { id: report.category.id, name: report.category.name, slug: report.category.slug },
     district: report.district,
     village: report.village,
+    latitude: roundedPublicCoordinate(report.latitude),
+    longitude: roundedPublicCoordinate(report.longitude),
     status: report.status,
     thumbnailUrl: thumbnail ? mediaUrl(thumbnail.id) : null,
     createdAt: report.createdAt.toISOString()
+  };
+}
+
+function ownerReportListDto(report: ReportList) {
+  return {
+    ...publicReportListDto(report),
+    latitude: report.latitude == null ? null : Number(report.latitude),
+    longitude: report.longitude == null ? null : Number(report.longitude)
   };
 }
 
@@ -110,6 +128,8 @@ function publicReportDto(report: PublicDetail, detail = false) {
     category: { id: report.category.id, name: report.category.name, slug: report.category.slug },
     district: report.district,
     village: report.village,
+    latitude: roundedPublicCoordinate(report.latitude),
+    longitude: roundedPublicCoordinate(report.longitude),
     status: report.status,
     thumbnailUrl: photos[0]?.url ?? null,
     duplicateOf: report.duplicateOf
@@ -158,6 +178,8 @@ function ownerReportDto(report: OwnerDetail) {
   const publicDto = publicReportDto(report, true);
   return {
     ...publicDto,
+    latitude: report.latitude == null ? null : Number(report.latitude),
+    longitude: report.longitude == null ? null : Number(report.longitude),
     timeline: report.statusHistories.map((history) => ({
       fromStatus: history.fromStatus,
       toStatus: history.toStatus,
@@ -375,7 +397,7 @@ export async function listOwnerReports(
   return {
     total,
     counts: emptyStatusCounts(grouped),
-    data: reports.map((report) => publicReportListDto(report))
+    data: reports.map((report) => ownerReportListDto(report))
   };
 }
 
@@ -393,10 +415,7 @@ export async function listAdminReports(
   limit: number,
   filters: { status?: ReportStatus; category?: string }
 ) {
-  const where: Prisma.ReportWhereInput = {
-    ...(filters.status ? { status: filters.status } : {}),
-    ...(filters.category ? { category: { slug: filters.category } } : {})
-  };
+  const where = adminReportsWhere(filters);
   const [total, reports, grouped] = await prisma.$transaction([
     prisma.report.count({ where }),
     prisma.report.findMany({
@@ -417,6 +436,51 @@ export async function listAdminReports(
     counts: emptyStatusCounts(grouped),
     data: reports.map((report) => adminReportDto(report))
   };
+}
+
+function adminReportsWhere(filters: { status?: ReportStatus; category?: string }): Prisma.ReportWhereInput {
+  return {
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.category ? { category: { slug: filters.category } } : {})
+  };
+}
+
+function csvCell(value: string | number | boolean | null) {
+  const text = value === null ? "" : String(value);
+  const safeText = typeof value === "string" && /^[\u0000-\u0020]*[=+\-@]/.test(text)
+    ? `'${text}`
+    : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+}
+
+export async function exportAdminReports(filters: { status?: ReportStatus; category?: string }) {
+  const reports = await prisma.report.findMany({
+    where: adminReportsWhere(filters),
+    include: {
+      category: { select: { name: true, slug: true } },
+      reporter: { select: { name: true } }
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }]
+  });
+  const rows = [
+    ["code", "title", "category", "status", "reporter_name", "city", "district", "village",
+      "latitude", "longitude", "created_at", "is_hidden"],
+    ...reports.map((report) => [
+      report.publicCode,
+      report.title,
+      report.category.name,
+      report.status,
+      report.reporter.name,
+      report.city,
+      report.district,
+      report.village,
+      report.latitude === null ? null : Number(report.latitude),
+      report.longitude === null ? null : Number(report.longitude),
+      report.createdAt.toISOString(),
+      report.isHidden
+    ])
+  ];
+  return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
 }
 
 export async function getAdminReport(code: string) {

@@ -32,7 +32,24 @@ const createReportSchema = z.object({
   district: z.string().trim().min(1, "Kecamatan wajib diisi").max(100),
   village: z.string().trim().min(1, "Kelurahan wajib diisi").max(100),
   locationDetail: z.string().trim().min(5, "Patokan minimal 5 karakter").max(200),
+  latitude: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.coerce.number().min(-90, "Latitude harus antara -90 dan 90").max(90, "Latitude harus antara -90 dan 90").optional()
+  ),
+  longitude: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.coerce.number().min(-180, "Longitude harus antara -180 dan 180").max(180, "Longitude harus antara -180 dan 180").optional()
+  ),
   submissionKey: z.uuid("submissionKey harus UUID")
+}).superRefine((body, context) => {
+  if ((body.latitude === undefined) !== (body.longitude === undefined)) {
+    const missingCoordinate = body.latitude === undefined ? "latitude" : "longitude";
+    context.addIssue({
+      code: "custom",
+      path: [missingCoordinate],
+      message: "Latitude dan longitude harus diisi bersama"
+    });
+  }
 });
 
 const followUpSchema = z.object({
@@ -111,6 +128,16 @@ export const listAdminReports: RequestHandler = async (request, response) => {
   const filters = parseQuery(adminReportFiltersSchema, request.query);
   const result = await reportService.listAdminReports(page, limit, filters);
   sendList(response, result.data, listMeta(page, limit, result.total), result.counts);
+};
+
+export const exportAdminReports: RequestHandler = async (request, response) => {
+  const filters = parseQuery(adminReportFiltersSchema, request.query);
+  const csv = await reportService.exportAdminReports(filters);
+  response
+    .status(200)
+    .set("Content-Type", "text/csv; charset=utf-8")
+    .set("Content-Disposition", 'attachment; filename="laporinaja-reports.csv"')
+    .send(`\uFEFF${csv}`);
 };
 
 export const getAdminReport: RequestHandler = async (request, response) => {

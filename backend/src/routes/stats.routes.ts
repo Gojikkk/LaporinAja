@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 const statsRoutes = Router();
 
 statsRoutes.get("/stats/public", statsController.getPublicStats);
+statsRoutes.get("/stats/trends", statsController.getPublicCategoryTrends);
 statsRoutes.get(
   "/admin/stats",
   requireAuth,
