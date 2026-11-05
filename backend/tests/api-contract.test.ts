@@ -881,8 +881,7 @@ describe("report and privacy contract", () => {
 
   it.each([
     ["SUBMITTED", "IN_PROGRESS"],
-    ["IN_PROGRESS", "DUPLICATE"],
-    ["RESOLVED", "IN_PROGRESS"]
+    ["IN_PROGRESS", "DUPLICATE"]
   ])("TC-15 does not enable the out-of-scope transition %s to %s", async (fromStatus, toStatus) => {
     mocks.prisma.report.findUnique.mockResolvedValue({ id: reportData.id, status: fromStatus });
 
@@ -899,6 +898,127 @@ describe("report and privacy contract", () => {
     expect(response.status).toBe(422);
     expect(response.body.error.code).toBe("INVALID_TRANSITION");
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "Alasan 9"])(
+    "FR-024 requires a reason of at least 10 characters to reopen a resolved report (%s)",
+    async (reason) => {
+      mocks.prisma.report.findUnique.mockResolvedValue({
+        id: reportData.id,
+        status: "RESOLVED"
+      });
+
+      const response = await request(app)
+        .post("/api/admin/reports/LPR-2026-000001/status")
+        .set(mutationHeaders("ADMIN"))
+        .send({
+          toStatus: "IN_PROGRESS",
+          expectedStatus: "RESOLVED",
+          ...(reason === undefined ? {} : { reason })
+        });
+
+      expect(response.status).toBe(422);
+      expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      expect(response.body.error.fields.reason).toBe("Alasan minimal 10 karakter");
+      expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+      expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+      expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
+    }
+  );
+
+  it("FR-024 reopens within 14 days with authenticated actor and append-only history", async () => {
+    const historyId = "9ed1209d-9b25-47b6-b88b-d7d33120f481";
+    const reason = "Masalah muncul kembali setelah perbaikan";
+    const resolvedAt = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
+    let insideTransaction = false;
+    mocks.prisma.$transaction.mockImplementationOnce(async (operation: unknown) => {
+      insideTransaction = true;
+      try {
+        return await (operation as (tx: typeof mocks.prisma) => unknown)(mocks.prisma);
+      } finally {
+        insideTransaction = false;
+      }
+    });
+    mocks.prisma.report.findUnique.mockResolvedValue({
+      id: reportData.id,
+      status: "RESOLVED",
+      reporterId: user.id,
+      title: reportData.title,
+      reporter: { email: "rani@example.com" }
+    });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "RESOLVED", resolvedAt }]);
+    mocks.prisma.report.updateMany.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { count: 1 };
+    });
+    mocks.prisma.reportStatusHistory.create.mockImplementation(async () => {
+      expect(insideTransaction).toBe(true);
+      return { id: historyId };
+    });
+    mocks.prisma.notification.create.mockImplementation(async (args) => {
+      expect(insideTransaction).toBe(true);
+      return args.data;
+    });
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "IN_PROGRESS",
+        expectedStatus: "RESOLVED",
+        reason
+      });
+
+    expect(response.status).toBe(200);
+    expect(mocks.prisma.report.updateMany).toHaveBeenCalledWith({
+      where: { id: reportData.id, status: "RESOLVED" },
+      data: { status: "IN_PROGRESS", resolvedAt: null }
+    });
+    expect(mocks.prisma.reportStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        reportId: reportData.id,
+        fromStatus: "RESOLVED",
+        toStatus: "IN_PROGRESS",
+        changedBy: user.id,
+        reason
+      },
+      select: { id: true }
+    });
+    expect(mocks.prisma.notification.create).toHaveBeenCalledWith({
+      data: {
+        userId: user.id,
+        reportId: reportData.id,
+        type: "REPORT_STATUS_CHANGED",
+        message: "Laporan Anda sedang ditindaklanjuti."
+      }
+    });
+    expect(mocks.prisma.reportEvidence.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportEvidence.createMany).not.toHaveBeenCalled();
+  });
+
+  it("FR-024 rejects reopening more than 14 days after resolution without changing report or history", async () => {
+    const resolvedAt = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+    mocks.prisma.report.findUnique.mockResolvedValue({
+      id: reportData.id,
+      status: "RESOLVED"
+    });
+    mocks.prisma.$queryRaw.mockResolvedValueOnce([{ status: "RESOLVED", resolvedAt }]);
+
+    const response = await request(app)
+      .post("/api/admin/reports/LPR-2026-000001/status")
+      .set(mutationHeaders("ADMIN"))
+      .send({
+        toStatus: "IN_PROGRESS",
+        expectedStatus: "RESOLVED",
+        reason: "Masalah muncul kembali setelah perbaikan"
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(response.body.error.fields.toStatus).toContain("14 hari");
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportStatusHistory.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.notification.create).not.toHaveBeenCalled();
   });
 
   it.each([
