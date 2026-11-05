@@ -1,6 +1,7 @@
 ﻿import { Prisma, ReportStatus } from "@prisma/client";
 import { prisma } from "../db";
 import { generatePublicCode } from "../utils/public-code";
+import { sendReportStatusEmail } from "./email.service";
 import { HttpError } from "../utils/http-error";
 import { mediaUrl } from "../utils/media-signature";
 import { deleteStoredImages, storeImages } from "../utils/uploads";
@@ -9,6 +10,15 @@ export const publicStatusValues = ["VERIFIED", "IN_PROGRESS", "RESOLVED", "DUPLI
 export const publicStatuses: ReportStatus[] = [...publicStatusValues];
 
 const reportCodePattern = /^LPR-\d{4}-\d{6,}$/;
+
+const statusNotificationMessages: Record<ReportStatus, string> = {
+  SUBMITTED: "Laporan Anda telah dikirim kembali untuk ditinjau.",
+  VERIFIED: "Laporan Anda telah diverifikasi.",
+  IN_PROGRESS: "Laporan Anda sedang ditindaklanjuti.",
+  RESOLVED: "Laporan Anda telah selesai ditangani.",
+  REJECTED: "Laporan Anda ditolak. Silakan periksa detail laporan untuk informasi lebih lanjut.",
+  DUPLICATE: "Laporan Anda ditandai sebagai duplikat."
+};
 
 export type PublicReportFilters = {
   q?: string;
@@ -484,7 +494,13 @@ export async function changeReportStatus(
 ) {
   const report = await prisma.report.findUnique({
     where: { publicCode: code },
-    select: { id: true, status: true }
+    select: {
+      id: true,
+      status: true,
+      reporterId: true,
+      title: true,
+      reporter: { select: { email: true } }
+    }
   });
   if (!report) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
   if (report.status !== body.expectedStatus) {
@@ -580,7 +596,7 @@ export async function changeReportStatus(
       }
     });
     if (updated.count !== 1) throw new HttpError(409, "STATUS_CONFLICT", "Status laporan sudah berubah");
-    return tx.reportStatusHistory.create({
+    const history = await tx.reportStatusHistory.create({
       data: {
         reportId: report.id,
         fromStatus: body.expectedStatus,
@@ -590,6 +606,31 @@ export async function changeReportStatus(
       },
       select: { id: true }
     });
+    await tx.notification.create({
+      data: {
+        userId: report.reporterId,
+        reportId: report.id,
+        type: "REPORT_STATUS_CHANGED",
+        message: statusNotificationMessages[body.toStatus]
+      }
+    });
+    return history;
   });
+  try {
+    await sendReportStatusEmail({
+      to: report.reporter.email,
+      reportCode: code,
+      reportTitle: report.title,
+      previousStatus: body.expectedStatus,
+      newStatus: body.toStatus,
+      message: statusNotificationMessages[body.toStatus]
+    });
+  } catch (error) {
+    console.error("Gagal mengirim email perubahan status laporan", {
+      reportCode: code,
+      status: body.toStatus,
+      error
+    });
+  }
   return { code, status: body.toStatus, historyId: history.id };
 }
