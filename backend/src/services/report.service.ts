@@ -511,7 +511,8 @@ export async function changeReportStatus(
     SUBMITTED: ["VERIFIED", "REJECTED", "DUPLICATE"],
     VERIFIED: ["IN_PROGRESS", "REJECTED", "DUPLICATE"],
     IN_PROGRESS: ["RESOLVED"],
-    REJECTED: ["SUBMITTED"]
+    REJECTED: ["SUBMITTED"],
+    RESOLVED: ["IN_PROGRESS"]
   };
   if (!allowed[report.status]?.includes(body.toStatus)) {
     throw new HttpError(422, "INVALID_TRANSITION", "Perubahan status tidak diizinkan");
@@ -523,7 +524,8 @@ export async function changeReportStatus(
         : "Kode laporan utama hanya dapat diisi saat status menjadi DUPLICATE"
     });
   }
-  if ((body.toStatus === "REJECTED" || report.status === "REJECTED") &&
+  if ((body.toStatus === "REJECTED" || report.status === "REJECTED" ||
+       (report.status === "RESOLVED" && body.toStatus === "IN_PROGRESS")) &&
       (body.reason?.length ?? 0) < 10) {
     throw new HttpError(422, "VALIDATION_ERROR", "Data tidak valid", {
       reason: "Alasan minimal 10 karakter"
@@ -531,13 +533,23 @@ export async function changeReportStatus(
   }
 
   const history = await prisma.$transaction(async (tx) => {
-    const lockedReports = await tx.$queryRaw<Array<{ status: ReportStatus }>>`
-      SELECT status::text AS status FROM reports WHERE id = ${report.id}::uuid FOR UPDATE
+    const lockedReports = await tx.$queryRaw<Array<{ status: ReportStatus; resolvedAt: Date | null }>>`
+      SELECT status::text AS status, resolved_at AS "resolvedAt"
+      FROM reports WHERE id = ${report.id}::uuid FOR UPDATE
     `;
     const lockedReport = lockedReports[0];
     if (!lockedReport) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
     if (lockedReport.status !== body.expectedStatus) {
       throw new HttpError(409, "STATUS_CONFLICT", "Status laporan sudah berubah");
+    }
+    if (lockedReport.status === "RESOLVED" && body.toStatus === "IN_PROGRESS") {
+      const reopenWindowMs = 14 * 24 * 60 * 60 * 1000;
+      if (!lockedReport.resolvedAt ||
+          Date.now() - lockedReport.resolvedAt.getTime() > reopenWindowMs) {
+        throw new HttpError(422, "VALIDATION_ERROR", "Data tidak valid", {
+          toStatus: "Laporan hanya dapat dibuka kembali maksimal 14 hari sejak diselesaikan"
+        });
+      }
     }
 
     let duplicateOfReportId: string | undefined;
@@ -592,7 +604,10 @@ export async function changeReportStatus(
         status: body.toStatus,
         ...(duplicateOfReportId ? { duplicateOfReportId } : {}),
         ...(body.toStatus === "VERIFIED" ? { verifiedAt: new Date() } : {}),
-        ...(body.toStatus === "RESOLVED" ? { resolvedAt: new Date() } : {})
+        ...(body.toStatus === "RESOLVED" ? { resolvedAt: new Date() } : {}),
+        ...(body.toStatus === "IN_PROGRESS" && body.expectedStatus === "RESOLVED"
+          ? { resolvedAt: null }
+          : {})
       }
     });
     if (updated.count !== 1) throw new HttpError(409, "STATUS_CONFLICT", "Status laporan sudah berubah");

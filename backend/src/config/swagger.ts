@@ -1070,12 +1070,13 @@ const paths: Record<string, any> = {
         "- `SUBMITTED` → `DUPLICATE` dengan `duplicateOfCode` valid\n" +
         "- `VERIFIED` → `IN_PROGRESS`, `REJECTED`, atau `DUPLICATE` dengan `duplicateOfCode` valid\n" +
         "- `IN_PROGRESS` → `RESOLVED`\n" +
-        "- `REJECTED` → `SUBMITTED`\n\n" +
-        "Alasan minimal 10 karakter wajib untuk penolakan dan koreksi dari `REJECTED` ke `SUBMITTED`. " +
+        "- `REJECTED` → `SUBMITTED`\n" +
+        "- `RESOLVED` → `IN_PROGRESS` untuk membuka kembali laporan maksimal 14 hari sejak diselesaikan\n\n" +
+        "Alasan minimal 10 karakter wajib untuk penolakan, koreksi dari `REJECTED` ke `SUBMITTED`, dan pembukaan kembali laporan. " +
         "Target duplikat harus berstatus `VERIFIED`, `IN_PROGRESS`, atau `RESOLVED`, dan bukan laporan itu sendiri. " +
         "Detail publik laporan duplikat berisi tautan laporan utama tanpa identitas pribadi. " +
-        "Jika laporan utama kemudian `REJECTED`, perilakunya belum diputuskan (OQ-06); sistem tidak mengubah relasi otomatis.\n\n" +
-        "Pembukaan kembali `RESOLVED` belum termasuk MVP.\n\n" +
+        "Jika laporan utama kemudian `REJECTED`, perilakunya belum diputuskan (OQ-06); sistem tidak mengubah relasi otomatis. " +
+        "Pembukaan kembali menyimpan alasan dan aktor dari sesi ke riwayat baru tanpa menghapus bukti lama.\n\n" +
         "Transisi ke `RESOLVED` hanya dapat dilakukan jika sudah ada catatan penyelesaian " +
         "beserta minimal satu foto bukti atau penjelasan tertulis minimal 30 karakter.",
       security: [{ cookieAuth: [] }],
@@ -1093,7 +1094,7 @@ const paths: Record<string, any> = {
               properties: {
                 toStatus:       { $ref: "#/components/schemas/ReportStatus", description: "Status baru; DUPLICATE hanya dari SUBMITTED/VERIFIED" },
                 expectedStatus: { $ref: "#/components/schemas/ReportStatus", description: "Status saat ini yang diharapkan (optimistic lock)" },
-                reason:         { type: "string", minLength: 10, example: "Laporan tidak sesuai cakupan platform ini.", description: "Wajib minimal 10 karakter untuk penolakan atau koreksi dari REJECTED ke SUBMITTED" },
+                reason:         { type: "string", minLength: 10, example: "Masalah muncul kembali setelah perbaikan.", description: "Wajib minimal 10 karakter untuk penolakan, koreksi dari REJECTED ke SUBMITTED, atau membuka kembali laporan RESOLVED" },
                 duplicateOfCode: { type: "string", pattern: "^LPR-\\d{4}-\\d{6,}$", example: "LPR-2026-000002", description: "Wajib saat toStatus=DUPLICATE; target harus VERIFIED, IN_PROGRESS, atau RESOLVED dan bukan laporan ini" },
               },
             },
