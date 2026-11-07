@@ -15,12 +15,12 @@ export const statusInfo: Record<Status, { text: string; icon: typeof Clock3; cls
 export type ReportCategory = { id: string; name: string; slug: string; icon: string; active: boolean }
 
 export const initialCategories: ReportCategory[] = [
-  { id:'cat-jalan-rusak', name:'Jalan rusak', slug:'jalan-rusak', icon:'⌁', active:true },
-  { id:'cat-lampu-jalan', name:'Lampu jalan', slug:'lampu-jalan', icon:'☼', active:true },
-  { id:'cat-sampah', name:'Sampah', slug:'sampah', icon:'♧', active:true },
-  { id:'cat-saluran-air', name:'Saluran air', slug:'saluran-air', icon:'≈', active:true },
-  { id:'cat-fasilitas-umum', name:'Fasilitas umum', slug:'fasilitas-umum', icon:'⌂', active:true },
-  { id:'cat-lainnya', name:'Lainnya', slug:'lainnya', icon:'•', active:true },
+  { id:'cat-jalan-rusak', name:'Jalan rusak', slug:'jalan-rusak', icon:'route', active:true },
+  { id:'cat-lampu-jalan', name:'Lampu jalan', slug:'lampu-jalan', icon:'lamp', active:true },
+  { id:'cat-sampah', name:'Sampah', slug:'sampah', icon:'trash', active:true },
+  { id:'cat-saluran-air', name:'Saluran air', slug:'saluran-air', icon:'droplets', active:true },
+  { id:'cat-fasilitas-umum', name:'Fasilitas umum', slug:'fasilitas-umum', icon:'building', active:true },
+  { id:'cat-lainnya', name:'Lainnya', slug:'lainnya', icon:'shapes', active:true },
 ]
 
 export const categoryNames = initialCategories.map(c => c.name)
