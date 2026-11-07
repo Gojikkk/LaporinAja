@@ -287,22 +287,56 @@ export function Detail(){
   const report=toCard(found),notes=found.history,last=latestNote(found)
   const primaryFound=publicPrimaryReportOf(reports,found)
   const primary=primaryFound?toCard(primaryFound):undefined
+  const isDuplicate=report.status==='DUPLICATE'
+  const resolved=found.status==='RESOLVED'
+  const copyLink=()=>{ navigator.clipboard?.writeText(window.location.href) }
+  const notice=<section className="detail-notice" aria-live="polite">
+    <span className="notice-icon"><Info size={14} aria-hidden="true"/></span>
+    <p className="notice-text"><b>{last.title}</b><span>{last.note}</span></p>
+    <StatusBadge status={report.status}/>
+  </section>
   return <AppShell><main className="page container">
-    <Link to="/laporan" className="back-link"><ArrowLeft size={16}/> Kembali ke daftar laporan</Link>
-    <div className="detail-heading"><div><div className="eyebrow"><span/> {report.code}</div><h1>{report.title}</h1><div className="detail-meta"><span>{report.category}</span><span>·</span><MapPin size={14}/><span>{report.village}, {report.district}</span><span>·</span><span>{report.date}</span></div></div><StatusBadge status={report.status}/></div>
-    <div className="detail-layout">
-      <div className="detail-main">
-        <div className={`detail-art report-art ${report.tone}`}><span className="art-symbol"><CategoryIcon category={report.category} size={52}/></span><span className="art-code">Dokumentasi laporan · {report.code}</span></div>
-        {report.status==='DUPLICATE'?<PrimaryReportCard report={report} primary={primary}/>:null}
-        <section className="detail-block"><h2>Tentang laporan</h2><p>{report.description}</p><p className="privacy-hint"><LockKeyhole size={15}/> Identitas pelapor tidak ditampilkan.</p></section>
-        <section className="detail-block"><h2>{primary?'Catatan penggabungan':'Catatan tindak lanjut'}</h2><div className="follow-card"><span className="follow-icon"><MessageSquareText size={17}/></span><div><b>{last.title}</b><p>{last.note}</p><small>Administrator platform · {last.at}</small></div></div></section>
+    <article className="detail-public">
+      <p className="detail-note">{report.category}</p>
+      {notice}
+      <header className="detail-heading">
+        <div>
+          <h1>{report.title}</h1>
+          <div className="detail-meta"><span>{report.category}</span><span>·</span><MapPin size={14} aria-hidden="true"/><span>{report.village}, {report.district}</span><span>·</span><span>{report.date}</span></div>
+        </div>
+      </header>
+      <section className="detail-info">
+        <div className={`detail-art report-art ${report.tone}`}><span className="art-symbol"><CategoryIcon category={report.category} size={52} aria-hidden="true"/></span><span className="art-code">Dokumentasi laporan · {report.code}</span></div>
+        <div className="condition-card">
+          <h2>Kondisi dan lokasi</h2>
+          <p>{report.description}</p>
+          <p className="condition-meta"><MapPin size={15} aria-hidden="true"/>{report.village}, {report.district}</p>
+        </div>
+      </section>
+      {isDuplicate ? <PrimaryReportCard report={report} primary={primary}/> : resolved ? (
+        <section className="detail-block detail-bukti">
+          <h2>Bukti penyelesaian</h2>
+          <div className="bukti-compare">
+            <figure className="bukti-item"><div className={`detail-art report-art ${report.tone}`}><span className="art-symbol"><CategoryIcon category={report.category} size={44} aria-hidden="true"/></span></div><figcaption>Sebelum</figcaption></figure>
+            <figure className="bukti-item"><div className={`detail-art report-art ${report.tone}`}><span className="art-symbol"><CategoryIcon category={report.category} size={44} aria-hidden="true"/></span></div><figcaption>Sesudah</figcaption></figure>
+          </div>
+          {notice}
+        </section>
+      ) : (
+        <section className="detail-block">
+          <h2>{primary?'Catatan penggabungan':'Catatan tindak lanjut'}</h2>
+          <div className="follow-card"><span className="follow-icon"><MessageSquareText size={17} aria-hidden="true"/></span><div><b>{last.title}</b><p>{last.note}</p><small>Administrator platform · {last.at}</small></div></div>
+        </section>
+      )}
+      <section className="detail-block detail-timeline">
+        <h2>Linimasa laporan</h2>
+        <p className="detail-timeline-note">Riwayat perubahan status laporan.</p>
+        <Timeline report={report} history={notes}/>
+      </section>
+      <div className="detail-actions">
+        <Button variant="outline" onClick={copyLink}>Salin tautan laporan <ArrowUpRight size={16} aria-hidden="true"/></Button>
       </div>
-      <aside className="detail-aside">
-        <section className="aside-card"><div className="aside-card-head"><h2>Jejak laporan</h2><span>{notes.length} LANGKAH</span></div><Timeline report={report} history={notes}/></section>
-        <section className="aside-card location-card"><h2>Wilayah</h2><p><MapPin size={16}/>{report.village}, {report.district}</p><small>Patokan lokasi terperinci tidak ditampilkan di halaman publik.</small></section>
-        <button className="share-button" onClick={()=>navigator.clipboard?.writeText(window.location.href)}>Salin tautan laporan <ArrowUpRight size={16}/></button>
-      </aside>
-    </div>
+    </article>
   </main></AppShell>
 }
 
