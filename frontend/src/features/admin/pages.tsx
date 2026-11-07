@@ -432,7 +432,7 @@ export function AdminQueue() {
 
 /* ------------------------------------------------------------- review detail */
 
-type ActionKind = 'verify' | 'reject' | 'start' | 'resolve' | 'reopen' | 'duplicate'
+type ActionKind = 'verify' | 'reject' | 'start' | 'resolve' | 'reopen' | 'reopenResolved' | 'duplicate'
 
 const actionCopy: Record<
   ActionKind,
@@ -490,7 +490,7 @@ const actionCopy: Record<
     intro:
       'Penyelesaian memerlukan catatan hasil dan bukti foto. Bila bukti visual tidak memungkinkan, tulis penjelasan minimal 30 karakter.',
     submit: 'Catat penyelesaian',
-    success: 'Penyelesaian dicatat. Riwayat laporan tetap utuh dan tidak dapat diubah.',
+    success: 'Penyelesaian dicatat. Riwayat laporan tetap utuh dan dapat ditelusuri.',
     history: 'Tindak lanjut selesai dicatat',
     next: 'RESOLVED',
     fieldLabel: 'Catatan hasil',
@@ -511,6 +511,19 @@ const actionCopy: Record<
     fieldPlaceholder: 'Contoh: pelapor mengirim foto tambahan yang memperjelas kondisi.',
     minLength: 10,
   },
+  reopenResolved: {
+    title: 'Buka kembali laporan ini?',
+    intro:
+      'Laporan yang sudah selesai dapat dibuka kembali bila masalah muncul lagi atau penyelesaian belum tuntas. Status akan kembali ke “Dalam tindak lanjut” dan laporan tetap tampil di halaman publik.',
+    submit: 'Buka kembali laporan',
+    success: 'Laporan dibuka kembali dan statusnya kembali ke tindak lanjut.',
+    history: 'Laporan dibuka kembali',
+    next: 'IN_PROGRESS',
+    fieldLabel: 'Alasan pembukaan kembali',
+    fieldHint: 'Jelaskan mengapa penyelesaian perlu ditinjau ulang.',
+    fieldPlaceholder: 'Contoh: warga melaporkan masalah yang sama muncul kembali setelah dua minggu.',
+    minLength: 10,
+  },
   duplicate: {
     title: 'Tandai sebagai duplikat',
     intro:
@@ -528,6 +541,7 @@ const actionMeta: Record<ActionKind, { label: string; icon: ReactNode }> = {
   start: { label: 'Mulai tindak lanjut', icon: <Wrench size={17} aria-hidden="true" /> },
   resolve: { label: 'Catat penyelesaian', icon: <CheckCircle2 size={17} aria-hidden="true" /> },
   reopen: { label: 'Kembalikan ke antrean', icon: <RotateCcw size={17} aria-hidden="true" /> },
+  reopenResolved: { label: 'Buka kembali laporan', icon: <RotateCcw size={17} aria-hidden="true" /> },
   duplicate: { label: 'Tandai sebagai duplikat', icon: <Copy size={17} aria-hidden="true" /> },
 }
 
@@ -535,13 +549,12 @@ const availableActions: Record<Status, ActionKind[]> = {
   SUBMITTED: ['verify', 'duplicate', 'reject'],
   VERIFIED: ['start', 'duplicate', 'reject'],
   IN_PROGRESS: ['resolve', 'duplicate'],
-  RESOLVED: [],
+  RESOLVED: ['reopenResolved'],
   REJECTED: ['reopen'],
   DUPLICATE: ['reopen'],
 }
 
 const readonlyCopy: Partial<Record<Status, string>> = {
-  RESOLVED: 'Penyelesaian sudah dicatat. Catatan dan bukti tetap dapat dibaca, tanpa opsi perubahan.',
   DUPLICATE:
     'Laporan ini terhubung ke laporan utama. Gunakan “Kembalikan ke antrean” bila tautan duplikat perlu dicabut.',
 }
@@ -853,7 +866,9 @@ export function AdminDetail() {
             <p className="adm-card-note">
               {report.status === 'IN_PROGRESS'
                 ? 'Penyelesaian memerlukan catatan hasil dan bukti foto, atau penjelasan minimal 30 karakter.'
-                : 'Tidak dapat langsung beralih ke Tindak lanjut selesai.'}
+                : report.status === 'RESOLVED'
+                  ? 'Membuka kembali laporan akan mengembalikan status ke Dalam tindak lanjut dan tercatat di riwayat.'
+                  : 'Tidak dapat langsung beralih ke Tindak lanjut selesai.'}
             </p>
           </>
         ) : (
