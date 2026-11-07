@@ -6,7 +6,7 @@ export type Status = 'SUBMITTED' | 'VERIFIED' | 'IN_PROGRESS' | 'RESOLVED' | 'RE
  * Bentuk ringkas laporan untuk kartu dan linimasa halaman warga.
  * Data aslinya ada di `shared/report-store.ts`; `toCard()` memetakannya ke sini.
  */
-export type Report = { code: string; title: string; category: string; district: string; village: string; status: Status; date: string; description: string; tone: string }
+export type Report = { code: string; title: string; category: string; district: string; village: string; status: Status; date: string; description: string; tone: string; primaryReportCode?: string }
 
 export const statusInfo: Record<Status, { text: string; icon: typeof Clock3; cls: string }> = {
   SUBMITTED:{ text:'Menunggu verifikasi', icon:Clock3, cls:'submitted' }, VERIFIED:{ text:'Terverifikasi', icon:CheckCircle2, cls:'verified' }, IN_PROGRESS:{ text:'Dalam tindak lanjut', icon:SlidersHorizontal, cls:'progress' }, RESOLVED:{ text:'Selesai dicatat', icon:Check, cls:'resolved' }, REJECTED:{ text:'Ditolak', icon:CircleAlert, cls:'rejected' }, DUPLICATE:{ text:'Laporan serupa', icon:FileCheck2, cls:'duplicate' },

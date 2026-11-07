@@ -505,6 +505,154 @@ html:has(.app-theme) body {
   color: #6d28d9;
 }
 
+/* ------------------------------------------------ rujukan laporan utama */
+
+.app-theme .primary-card {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+  padding: 20px;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+}
+
+.app-theme .primary-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.app-theme .primary-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.app-theme .primary-card-head h2 {
+  margin: 0;
+  color: #5b21b6;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.app-theme .primary-card-head p {
+  margin: 4px 0 0;
+  color: #6b46c1;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.app-theme .primary-card-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+}
+
+.app-theme .primary-card-code {
+  display: block;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.app-theme .primary-card-title {
+  display: block;
+  margin: 4px 0 6px;
+  color: var(--app-navy);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.app-theme .primary-card-title:hover {
+  color: #6d28d9;
+}
+
+.app-theme .primary-card-meta {
+  display: block;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.app-theme .primary-card-note {
+  margin: 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px dashed #c4b5fd;
+  border-radius: 10px;
+  color: #6b46c1;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.app-theme .primary-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-theme .primary-card .button.outline {
+  background: #fff;
+  border-color: #ddd6fe;
+  color: #5b21b6;
+}
+
+.app-theme .primary-card .button.outline:hover {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #5b21b6;
+}
+
+.app-theme .primary-card-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 45px;
+  padding: 0 16px;
+  background: #fff;
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  color: #5b21b6;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-theme .primary-card-copy:hover {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+@media (max-width: 760px) {
+  .app-theme .primary-card {
+    padding: 16px;
+  }
+
+  .app-theme .primary-card-body {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .app-theme .primary-card-actions .button,
+  .app-theme .primary-card-copy {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
 .app-theme .round-link {
   border-color: var(--app-line);
   color: var(--app-body);
