@@ -1821,3 +1821,246 @@ html:has(.app-theme) body {
     align-items: flex-start;
   }
 }
+
+/* ------------------------------------------------------- LAP-20 detail publik */
+
+.app-theme .detail-public {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 32px;
+  width: 100%;
+}
+
+.app-theme .detail-public > * {
+  width: 100%;
+}
+
+.app-theme .detail-public .detail-note {
+  margin: 0;
+  color: var(--app-teal);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.app-theme .detail-public .detail-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  background: var(--app-teal-soft);
+  border: 1px solid var(--app-teal-line);
+  border-radius: 8px;
+}
+
+.app-theme .detail-public .notice-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.7px solid var(--app-teal);
+  border-radius: 50%;
+  color: var(--app-teal);
+}
+
+.app-theme .detail-public .notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--app-teal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.app-theme .detail-public .notice-text b,
+.app-theme .detail-public .notice-text span {
+  font-weight: 700;
+}
+
+.app-theme .detail-public .detail-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.app-theme .detail-public .detail-heading h1 {
+  margin: 0;
+  color: #102d3b;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.app-theme .detail-public .detail-heading .detail-meta {
+  margin-top: 10px;
+}
+
+.app-theme .detail-public .detail-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 32px;
+  width: 100%;
+  align-items: start;
+}
+
+.app-theme .detail-public .detail-info .detail-art {
+  height: 380px;
+  border-radius: 8px;
+}
+
+.app-theme .detail-public .detail-info .art-symbol svg {
+  width: 52px;
+  height: 52px;
+}
+
+.app-theme .condition-card {
+  background: #fff;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-theme .condition-card h2 {
+  margin: 0;
+  color: #102d3b;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.app-theme .condition-card > p {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.app-theme .condition-card .condition-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 14px;
+}
+
+.app-theme .detail-public .detail-block.detail-bukti {
+  background: #fff;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.app-theme .detail-public .detail-block.detail-bukti h2 {
+  margin: 0;
+  color: #102d3b;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.app-theme .detail-public .detail-block.detail-timeline {
+  background: #fff;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-theme .detail-public .detail-block.detail-timeline h2 {
+  margin: 0;
+  color: #102d3b;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.app-theme .detail-public .detail-block.detail-timeline > p {
+  margin: 0;
+  color: var(--app-body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.app-theme .detail-public .detail-block:not(.detail-bukti):not(.detail-timeline) {
+  background: #fff;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-theme .detail-public .detail-block:not(.detail-bukti):not(.detail-timeline) h2 {
+  margin: 0;
+  color: var(--app-navy);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.app-theme .bukti-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.app-theme .bukti-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-theme .bukti-item .detail-art {
+  height: 300px;
+}
+
+.app-theme .bukti-item figcaption {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.app-theme .detail-public .detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.app-theme .detail-public .detail-actions .button {
+  min-height: 44px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+@media (max-width: 1000px) {
+  .app-theme .detail-public .detail-info {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 430px) {
+  .app-theme .detail-public .detail-heading h1 {
+    font-size: 28px;
+  }
+}
