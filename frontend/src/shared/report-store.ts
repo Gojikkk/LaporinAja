@@ -24,6 +24,8 @@ export type AdminReport = {
   description: string
   photos: number
   history: AdminHistoryEntry[]
+  /** Kode laporan utama bila laporan ini ditandai sebagai duplikat. */
+  primaryReportCode?: string
 }
 
 export const adminStatus: Record<Status, { label: string; tone: string }> = {
@@ -264,6 +266,7 @@ const seededReports: AdminReport[] = [
     landmark: 'Taman sisi utara',
     status: 'DUPLICATE',
     submittedAt: '2026-10-26',
+    primaryReportCode: 'LPR-2026-000021',
     reporter: 'Bagas',
     description:
       'Salah satu bangku taman terlihat rusak pada bagian sandaran. Ada laporan serupa yang telah dicatat sebelumnya.',
@@ -620,6 +623,42 @@ const seededReports: AdminReport[] = [
       },
     ],
   },
+  {
+    code: 'LPR-2026-000021',
+    title: 'Bangku taman rusak di Taman Citarum',
+    category: 'Fasilitas umum',
+    city: 'Bandung',
+    district: 'Bandung Wetan',
+    village: 'Citarum',
+    landmark: 'Taman sisi utara',
+    status: 'RESOLVED',
+    submittedAt: '2026-10-22',
+    reporter: 'Nadia',
+    description:
+      'Sandaran salah satu bangku taman patah sehingga tidak aman dipakai. Bagian kayu juga sudah lapuk di sisi kanan.',
+    photos: 2,
+    history: [
+      { at: '22 Okt 2026 · 09.12 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
+      {
+        at: '22 Okt 2026 · 10.05 WIB',
+        title: 'Laporan diverifikasi',
+        transition: 'Menunggu verifikasi → Terverifikasi',
+        note: 'Lokasi dan kategori sesuai.',
+      },
+      {
+        at: '23 Okt 2026 · 08.40 WIB',
+        title: 'Tindak lanjut dimulai',
+        transition: 'Terverifikasi → Sedang ditindaklanjuti',
+        note: 'Perbaikan bangku dijadwalkan pada akhir pekan.',
+      },
+      {
+        at: '25 Okt 2026 · 14.20 WIB',
+        title: 'Tindak lanjut selesai dicatat',
+        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
+        note: 'Sandaran bangku diganti dan permukaan kayu dirapikan. Bukti penyelesaian dilampirkan.',
+      },
+    ],
+  },
 ]
 
 /* ------------------------------------------------------------------------- */
@@ -684,6 +723,7 @@ export function transitionReport(
     return {
       ...report,
       status: to,
+      primaryReportCode: to === 'DUPLICATE' ? report.primaryReportCode : undefined,
       history: [
         ...report.history,
         {
@@ -696,6 +736,89 @@ export function transitionReport(
     }
   })
   emit()
+}
+
+/**
+ * Tandai laporan sebagai duplikat dan hubungkan ke laporan utama.
+ * Laporan utama wajib sudah tampil di publik dan bukan duplikat. Bila laporan
+ * yang ditandai sebelumnya menjadi acuan laporan lain, rujukan itu dialihkan
+ * ke laporan utama yang baru agar rantai referensi tetap satu tingkat.
+ */
+export function markDuplicate(code: string, primaryCode: string, note?: string) {
+  const source = reports.find((report) => report.code === code)
+  const primary = reports.find((report) => report.code === primaryCode)
+  if (
+    !source ||
+    code === primaryCode ||
+    !primary ||
+    !isPublicReport(primary) ||
+    primary.status === 'DUPLICATE' ||
+    !['SUBMITTED', 'VERIFIED', 'IN_PROGRESS'].includes(source.status)
+  ) {
+    return false
+  }
+  const extra = note?.trim()
+  reports = reports.map((report) => {
+    // Rujukan yang sebelumnya menunjuk ke laporan ini dialihkan ke acuan baru.
+    if (report.primaryReportCode === code) {
+      return {
+        ...report,
+        primaryReportCode: primaryCode,
+        history: [
+          ...report.history,
+          {
+            at: jakartaNow(),
+            title: 'Rujukan duplikat dialihkan',
+            note: `Laporan utama ${code} ditandai duplikat, sehingga rujukan dialihkan ke laporan utama ${primaryCode}.`,
+          },
+        ],
+      }
+    }
+    if (report.code !== code) return report
+    return {
+      ...report,
+      status: 'DUPLICATE',
+      primaryReportCode: primaryCode,
+      history: [
+        ...report.history,
+        {
+          at: jakartaNow(),
+          title: 'Ditandai sebagai duplikat',
+          transition: `${adminStatus[report.status].label} → Duplikat`,
+          note: `${extra ? `${extra} ` : ''}Merujuk pada laporan utama ${primaryCode}.`,
+        },
+      ],
+    }
+  })
+  emit()
+  return true
+}
+
+/** Kandidat laporan utama: sudah publik, bukan duplikat, dan bukan dirinya sendiri. */
+export function duplicateCandidates(rows: AdminReport[], code: string) {
+  const self = rows.find((report) => report.code === code)
+  return rows
+    .filter((report) => report.code !== code && isPublicReport(report) && report.status !== 'DUPLICATE')
+    .sort((a, b) => {
+      const sameCategory = Number(b.category === self?.category) - Number(a.category === self?.category)
+      return sameCategory || b.submittedAt.localeCompare(a.submittedAt)
+    })
+}
+
+/** Laporan utama yang dirujuk sebuah duplikat, bila ada. */
+export function primaryReportOf(rows: AdminReport[], report: AdminReport) {
+  if (!report.primaryReportCode) return undefined
+  return rows.find((row) => row.code === report.primaryReportCode)
+}
+
+/**
+ * Laporan utama yang masih tampil publik dan bukan duplikat. Halaman warga
+ * memakai ini agar tautan tidak berujung pada laporan yang sudah ditolak atau
+ * pada rantai duplikat bertingkat.
+ */
+export function publicPrimaryReportOf(rows: AdminReport[], report: AdminReport) {
+  const primary = primaryReportOf(rows, report)
+  return primary && isPublicReport(primary) && primary.status !== 'DUPLICATE' ? primary : undefined
 }
 
 export function countByStatus(rows: AdminReport[]) {
@@ -747,7 +870,8 @@ export function toCard(report: AdminReport): Report {
     village: report.village,
     status: report.status,
     date: formatSubmitted(report.submittedAt),
-    description: report.description,
+    description: report.description,
+    primaryReportCode: report.primaryReportCode,
     tone,
   }
 }

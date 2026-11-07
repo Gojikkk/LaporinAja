@@ -29,8 +29,11 @@ import {
   adminCategories,
   adminStatus,
   countByStatus,
+  duplicateCandidates,
   formatSubmitted,
+  markDuplicate,
   prioritize,
+  primaryReportOf,
   publicStatuses,
   transitionReport,
   useAdminReports,
@@ -429,7 +432,7 @@ export function AdminQueue() {
 
 /* ------------------------------------------------------------- review detail */
 
-type ActionKind = 'verify' | 'reject' | 'start' | 'resolve' | 'reopen'
+type ActionKind = 'verify' | 'reject' | 'start' | 'resolve' | 'reopen' | 'duplicate'
 
 const actionCopy: Record<
   ActionKind,
@@ -498,7 +501,7 @@ const actionCopy: Record<
   reopen: {
     title: 'Kembalikan ke antrean',
     intro:
-      'Laporan yang ditolak dapat dikembalikan ke antrean verifikasi. Sertakan alasan agar perubahan ini dapat ditelusuri.',
+      'Laporan yang ditolak atau ditandai duplikat dapat dikembalikan ke antrean verifikasi. Sertakan alasan agar perubahan ini dapat ditelusuri.',
     submit: 'Kembalikan ke antrean',
     success: 'Laporan kembali ke antrean verifikasi.',
     history: 'Laporan dikembalikan ke antrean',
@@ -508,6 +511,15 @@ const actionCopy: Record<
     fieldPlaceholder: 'Contoh: pelapor mengirim foto tambahan yang memperjelas kondisi.',
     minLength: 10,
   },
+  duplicate: {
+    title: 'Tandai sebagai duplikat',
+    intro:
+      'Pilih laporan utama yang sudah tercatat. Laporan ini tetap dapat dibaca publik dengan tautan menuju laporan utama.',
+    submit: 'Tandai duplikat',
+    success: 'Laporan ditandai duplikat dan terhubung ke laporan utama.',
+    history: 'Ditandai sebagai duplikat',
+    next: 'DUPLICATE',
+  },
 }
 
 const actionMeta: Record<ActionKind, { label: string; icon: ReactNode }> = {
@@ -516,36 +528,41 @@ const actionMeta: Record<ActionKind, { label: string; icon: ReactNode }> = {
   start: { label: 'Mulai tindak lanjut', icon: <Wrench size={17} aria-hidden="true" /> },
   resolve: { label: 'Catat penyelesaian', icon: <CheckCircle2 size={17} aria-hidden="true" /> },
   reopen: { label: 'Kembalikan ke antrean', icon: <RotateCcw size={17} aria-hidden="true" /> },
+  duplicate: { label: 'Tandai sebagai duplikat', icon: <Copy size={17} aria-hidden="true" /> },
 }
 
 const availableActions: Record<Status, ActionKind[]> = {
-  SUBMITTED: ['verify', 'reject'],
-  VERIFIED: ['start', 'reject'],
-  IN_PROGRESS: ['resolve'],
+  SUBMITTED: ['verify', 'duplicate', 'reject'],
+  VERIFIED: ['start', 'duplicate', 'reject'],
+  IN_PROGRESS: ['resolve', 'duplicate'],
   RESOLVED: [],
   REJECTED: ['reopen'],
-  DUPLICATE: [],
+  DUPLICATE: ['reopen'],
 }
 
 const readonlyCopy: Partial<Record<Status, string>> = {
   RESOLVED: 'Penyelesaian sudah dicatat. Catatan dan bukti tetap dapat dibaca, tanpa opsi perubahan.',
-  DUPLICATE: 'Laporan ini merujuk pada laporan utama. Tidak ada tindakan lanjutan yang tersedia di halaman ini.',
+  DUPLICATE:
+    'Laporan ini terhubung ke laporan utama. Gunakan “Kembalikan ke antrean” bila tautan duplikat perlu dicabut.',
 }
 
 function ActionDialog({
   kind,
   report,
+  candidates,
   onClose,
   onDone,
 }: {
   kind: ActionKind
   report: AdminReport
+  candidates: AdminReport[]
   onClose: () => void
   onDone: (message: string) => void
 }) {
   const copy = actionCopy[kind]
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [note, setNote] = useState('')
+  const [primary, setPrimary] = useState('')
   const [explanation, setExplanation] = useState('')
   const [hasProof, setHasProof] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
@@ -560,6 +577,19 @@ function ActionDialog({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const value = note.trim()
+
+    if (kind === 'duplicate') {
+      if (!primary) {
+        setError('Pilih laporan utama yang menjadi acuan.')
+        return
+      }
+      if (!markDuplicate(report.code, primary, value)) {
+        setError('Laporan utama tidak valid. Pilih laporan lain yang sudah tampil di publik dan bukan duplikat.')
+        return
+      }
+      onDone(copy.success)
+      return
+    }
 
     if (copy.confirm && !confirmed) {
       setError('Centang pernyataan pemeriksaan sebelum melanjutkan.')
@@ -611,6 +641,45 @@ function ActionDialog({
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
+          {kind === 'duplicate' ? (
+            <>
+              <div className="adm-dialog-field">
+                <label htmlFor="adm-primary">Laporan utama *</label>
+                <select
+                  id="adm-primary"
+                  value={primary}
+                  autoFocus
+                  onChange={(event) => {
+                    setPrimary(event.target.value)
+                    setError('')
+                  }}
+                >
+                  <option value="">Pilih laporan utama</option>
+                  {candidates.map((candidate) => (
+                    <option key={candidate.code} value={candidate.code}>
+                      {candidate.code} · {candidate.title} — {candidate.village}
+                    </option>
+                  ))}
+                </select>
+                <span className="adm-help">
+                  Hanya laporan yang sudah tampil di publik. Laporan dengan kategori sama muncul lebih dulu.
+                </span>
+                {candidates.length ? null : (
+                  <span className="adm-help">Belum ada laporan publik lain yang dapat dijadikan acuan.</span>
+                )}
+              </div>
+              <div className="adm-dialog-field">
+                <label htmlFor="adm-note">Catatan tambahan (opsional)</label>
+                <textarea
+                  id="adm-note"
+                  value={note}
+                  placeholder="Contoh: lokasi dan objek sama dengan laporan utama, hanya berbeda pelapor."
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </div>
+            </>
+          ) : null}
+
           {copy.fieldLabel ? (
             <div className="adm-dialog-field">
               <label htmlFor="adm-note">{copy.fieldLabel} *</label>
@@ -739,6 +808,8 @@ export function AdminDetail() {
 
   const actions = availableActions[report.status]
   const readonly = readonlyCopy[report.status]
+  const primary = primaryReportOf(reports, report)
+  const candidates = duplicateCandidates(reports, report.code)
 
   return (
     <AdminShell crumb={`Review · ${report.status}`}>
@@ -789,6 +860,38 @@ export function AdminDetail() {
           <p className="adm-card-note">{readonly ?? 'Tidak ada tindakan yang tersedia untuk status ini.'}</p>
         )}
       </section>
+
+      {report.status === 'DUPLICATE' ? (
+        <section className="adm-card" aria-labelledby="adm-primary">
+          <p className="adm-eyebrow">RUJUKAN DUPLIKAT</p>
+          <h2 className="adm-card-title" id="adm-primary">
+            Laporan utama
+          </h2>
+          {primary ? (
+            <>
+              <p className="adm-card-strong">
+                {primary.code} · {primary.title}
+              </p>
+              <p className="adm-card-note">
+                {primary.category} · {primary.city} / {primary.district} / {primary.village} ·{' '}
+                {adminStatus[primary.status].label}
+              </p>
+              <div className="adm-action-list">
+                <Link className="adm-btn adm-btn-outline" to={`/admin/laporan/${primary.code}`}>
+                  Buka di ruang admin
+                </Link>
+                <Link className="adm-btn adm-btn-outline" to={`/laporan/${primary.code}`}>
+                  Lihat halaman publik
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="adm-card-note">
+              Rujukan laporan utama tidak ditemukan pada data demo. Kembalikan laporan ke antrean lalu tandai ulang.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <Gallery report={report} />
 
@@ -849,6 +952,7 @@ export function AdminDetail() {
         <ActionDialog
           kind={dialog}
           report={report}
+          candidates={candidates}
           onClose={() => setDialog(null)}
           onDone={(message) => {
             setDialog(null)
