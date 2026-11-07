@@ -1499,3 +1499,325 @@ html:has(.app-theme) body {
   background: var(--app-teal-soft);
   color: var(--app-teal);
 }
+
+/* ------------------------------------------------- LAP-19 daftar laporan */
+/* Mengikuti frame "Laporan publik": filter 3 kontrol, kartu horizontal    */
+/* dua kolom di desktop, dan pagination 44px.                              */
+
+.app-theme .page-intro .eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.app-theme .listing-filter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 16px;
+  padding: 24px;
+  margin: 24px 0 32px;
+}
+
+.app-theme .listing-filter .filter-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-theme .listing-filter .filter-label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--app-ink);
+}
+
+.app-theme .listing-filter .search-field {
+  flex: none;
+  width: 100%;
+  max-width: none;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+.app-theme .listing-filter .search-field input {
+  font-size: 14px;
+}
+
+.app-theme .listing-filter .select-field {
+  flex: none;
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+}
+
+.app-theme .listing-filter .select-trigger {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--app-ink);
+}
+
+.app-theme .listing-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.app-theme .listing-actions .button {
+  min-height: 45px;
+}
+
+.app-theme .listing-actions .button:not(.outline) {
+  background: var(--app-ink);
+  color: #fff;
+}
+
+.app-theme .listing-actions .button:not(.outline):hover {
+  background: #1e293b;
+  color: #fff;
+}
+
+.app-theme .listing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.app-theme .report-card-row {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  padding: 24px;
+}
+
+.app-theme .report-card-row .report-art {
+  flex: none;
+  width: 112px;
+  height: 144px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+}
+
+.app-theme .report-card-row .art-symbol svg {
+  width: 36px;
+  height: 36px;
+}
+
+.app-theme .report-card-row .art-code {
+  display: none;
+}
+
+.app-theme .report-card-row .report-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0;
+}
+
+.app-theme .report-card-row .report-category {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #0e7490;
+}
+
+.app-theme .report-card-row .report-title {
+  min-height: 0;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--app-ink);
+}
+
+.app-theme .report-card-row .report-place {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-theme .report-card-row .report-date {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--app-body);
+}
+
+.app-theme .report-card-row .report-status {
+  margin-top: auto;
+}
+
+.app-theme .report-card-row .badge {
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.app-theme .pagination.listing-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 16px;
+  margin-top: 32px;
+  padding: 0;
+  font-size: 14px;
+  color: var(--app-body);
+}
+
+.app-theme .listing-pagination .listing-range {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--app-body);
+}
+
+.app-theme .listing-pagination .pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.app-theme .pagination.listing-pagination button {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--app-navy);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-theme .pagination.listing-pagination button:hover:not(:disabled) {
+  background: var(--app-teal-soft);
+  color: var(--app-teal);
+}
+
+.app-theme .pagination.listing-pagination button.current-page {
+  background: var(--app-teal);
+  border-color: var(--app-teal);
+  color: #fff;
+}
+
+.app-theme .listing-pagination .pagination-gap {
+  width: 44px;
+  text-align: center;
+  color: var(--app-muted);
+}
+
+.app-theme .empty-state.listing-empty {
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  background: var(--app-canvas);
+  padding: 40px 24px;
+  gap: 12px;
+}
+
+.app-theme .listing-empty > svg {
+  color: var(--app-muted);
+}
+
+.app-theme .listing-empty h2 {
+  font-size: 20px;
+}
+
+.app-theme .listing-empty p {
+  max-width: 460px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.app-theme .listing-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--app-teal-soft);
+  color: var(--app-body);
+}
+
+.app-theme .listing-notice svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--app-teal);
+}
+
+.app-theme .listing-notice p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (min-width: 768px) {
+  .app-theme .listing-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-theme .listing-filter .filter-field-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1001px) {
+  .app-theme .listing-filter {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .app-theme .listing-filter .filter-field-search {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 1000px) {
+  .app-theme .listing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .app-theme .listing-filter {
+    gap: 14px;
+    padding: 20px;
+  }
+
+  .app-theme .listing-grid {
+    gap: 16px;
+  }
+
+  .app-theme .report-card-row {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .app-theme .report-card-row .report-art {
+    width: 100%;
+    height: 160px;
+  }
+
+  .app-theme .report-card-row .report-title {
+    font-size: 18px;
+  }
+
+  .app-theme .pagination.listing-pagination {
+    align-items: flex-start;
+  }
+}

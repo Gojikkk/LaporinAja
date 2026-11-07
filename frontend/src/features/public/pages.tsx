@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bell, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, FileCheck2, FilePlus2, Filter, ImagePlus, Info, LayoutDashboard, ListChecks, ListFilter, LockKeyhole, LogIn, MapPin, Menu, MessageSquareText, MoreHorizontal, Search, ShieldCheck, SlidersHorizontal, Users, X } from 'lucide-react'
-import { AppShell, Button, CategoryIcon, Dropdown, PageIntro, PrimaryReportCard, ReportCard, StatCard, StatusBadge, Timeline, TextField, Toast, Modal } from '../../components/ui'
-import { countByStatus, publicReports, publicStatuses, latestNote, publicPrimaryReportOf, toCard, useReports } from '../../shared/report-store'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bell, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, FileCheck2, ImagePlus, Info, LayoutDashboard, ListChecks, ListFilter, LockKeyhole, LogIn, MapPin, Menu, MessageSquareText, MoreHorizontal, Search, SearchX, ShieldCheck, SlidersHorizontal, Users, X } from 'lucide-react'
+import { AppShell, Button, CategoryIcon, Dropdown, PageIntro, PrimaryReportCard, ReportCard, ReportListCard, StatCard, StatusBadge, Timeline, TextField, Toast, Modal } from '../../components/ui'
+import { countByStatus, filterPublicReports, paginatePublicReports, publicReports, publicStatuses, reportPageWindow, latestNote, publicPrimaryReportOf, toCard, useReports } from '../../shared/report-store'
 import { initialCategories, statusInfo, type Status } from '../../shared/report-data'
 export function Home(){
   const reports=useReports()
@@ -153,7 +153,131 @@ export function Home(){
   </main></AppShell>
 }
 
-export function Reports(){const [status,setStatus]=useState('Semua status'),[category,setCategory]=useState('Semua kategori'),[q,setQ]=useState('');const all=publicReports(useReports()).map(toCard);const rows=all.filter(r=>(status==='Semua status'||statusInfo[r.status].text===status)&&(category==='Semua kategori'||r.category===category)&&`${r.title} ${r.district} ${r.village}`.toLowerCase().includes(q.toLowerCase()));return <AppShell><main className="page container"><PageIntro title="Laporan warga" description="Temukan laporan fasilitas publik dan ikuti catatan perkembangannya." action={<Button to="/daftar" icon={<FilePlus2 size={17}/>}>Buat laporan</Button>}/><section className="filter-panel" aria-label="Filter laporan"><label className="search-field"><Search size={18}/><span className="sr-only">Cari laporan</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari judul atau wilayah…"/></label><Dropdown label="Filter kategori" value={category} onChange={setCategory} icon={<ListFilter size={17}/>} options={[{value:'Semua kategori',label:'Semua kategori'},{value:'Jalan rusak',label:'Jalan rusak'},{value:'Lampu jalan',label:'Lampu jalan'},{value:'Sampah',label:'Sampah'},{value:'Saluran air',label:'Saluran air'},{value:'Fasilitas umum',label:'Fasilitas umum'}]}/><Dropdown label="Filter status" value={status} onChange={setStatus} icon={<Filter size={16}/>} options={[{value:'Semua status',label:'Semua status'},...publicStatuses.map(s=>({value:s,label:statusInfo[s].text}))]}/><span className="result-count">{rows.length} laporan</span></section><div className="report-grid listing-grid">{rows.map(r=><ReportCard key={r.code} report={r}/>)}</div>{rows.length===0&&<div className="empty-state"><Search size={25}/><h2>Belum ada laporan yang sesuai</h2><p>Coba ubah kata kunci atau atur ulang filter.</p><Button variant="outline" onClick={()=>{setQ('');setCategory('Semua kategori');setStatus('Semua status')}}>Atur ulang filter</Button></div>}<div className="pagination"><span>Menampilkan {rows.length} dari {all.length} laporan publik</span><div><button aria-label="Halaman sebelumnya" disabled><ChevronLeft size={17}/></button><button className="current-page" aria-current="page">1</button><button aria-label="Halaman 2">2</button><button aria-label="Halaman selanjutnya"><ChevronRight size={17}/></button></div></div></main></AppShell>}
+type ReportDraft = { q: string; category: string; status: Status | '' }
+
+const emptyReportDraft: ReportDraft = { q: '', category: '', status: '' }
+
+/** Membaca filter dari URL dan mengabaikan nilai yang tidak dikenal. */
+function readReportDraft(params: URLSearchParams): ReportDraft {
+  const categorySlug = params.get('kategori') ?? ''
+  const category = initialCategories.find((item) => item.slug === categorySlug)?.name ?? ''
+  const statusParam = params.get('status') ?? ''
+  const status = (publicStatuses as string[]).includes(statusParam) ? (statusParam as Status) : ''
+  return { q: params.get('q') ?? '', category, status }
+}
+
+function categorySlugOf(name: string) {
+  return initialCategories.find((item) => item.name === name)?.slug ?? ''
+}
+
+export function Reports(){
+  const [params,setParams]=useSearchParams()
+  const applied=readReportDraft(params)
+  const requestedPage=Number.parseInt(params.get('halaman') ?? '1',10) || 1
+  const filtered=filterPublicReports(publicReports(useReports()),{
+    q: applied.q,
+    category: applied.category,
+    status: applied.status || undefined,
+  })
+  const result=paginatePublicReports(filtered,requestedPage)
+  const [draft,setDraft]=useState<ReportDraft>(applied)
+
+  // Tombol kembali/maju harus memulihkan isi form, bukan hanya hasilnya.
+  const appliedKey=`${applied.q}|${applied.category}|${applied.status}`
+  useEffect(()=>{ setDraft(applied) },[appliedKey])
+
+  // Parameternya juga dirapikan: halaman 1 dan nilai tidak valid tidak
+  // dibiarkan menempel di URL.
+  useEffect(()=>{
+    const rawPage=params.get('halaman')
+    const canonicalPage=result.page===1?null:String(result.page)
+    if(rawPage===canonicalPage) return
+    const next=new URLSearchParams(params)
+    if(canonicalPage===null) next.delete('halaman')
+    else next.set('halaman',canonicalPage)
+    setParams(next,{replace:true})
+  },[params,result.page,setParams])
+
+  function updateDraft(patch: Partial<ReportDraft>) {
+    setDraft(current=>({ ...current, ...patch }))
+  }
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const next=new URLSearchParams(params)
+    const keyword=draft.q.trim()
+    if(keyword) next.set('q',keyword)
+    else next.delete('q')
+    const categorySlug=categorySlugOf(draft.category)
+    if(categorySlug) next.set('kategori',categorySlug)
+    else next.delete('kategori')
+    if(draft.status) next.set('status',draft.status)
+    else next.delete('status')
+    next.delete('halaman')
+    setParams(next)
+  }
+
+  function resetFilters() {
+    setDraft(emptyReportDraft)
+    const next=new URLSearchParams(params)
+    for(const key of ['q','kategori','status','halaman']) next.delete(key)
+    setParams(next)
+  }
+
+  function goToPage(page: number) {
+    if(page===result.page) return
+    const next=new URLSearchParams(params)
+    if(page<=1) next.delete('halaman')
+    else next.set('halaman',String(page))
+    setParams(next)
+  }
+
+  return <AppShell><main className="page container">
+    <PageIntro eyebrow="LAPORAN WARGA" title="Laporan warga" description="Temukan laporan fasilitas publik dan ikuti catatan perkembangannya."/>
+    <form className="filter-panel listing-filter" role="search" aria-label="Filter laporan" onSubmit={applyFilters}>
+      <label className="filter-field filter-field-search">
+        <span className="filter-label">Kata kunci</span>
+        <span className="search-field">
+          <Search size={18} aria-hidden="true"/>
+          <input type="search" value={draft.q} onChange={event=>updateDraft({q:event.target.value})} placeholder="Cari judul, kode, atau wilayah…"/>
+        </span>
+      </label>
+      <div className="filter-field">
+        <span className="filter-label" id="filter-kategori-label">Kategori</span>
+        <Dropdown label="Filter kategori" labelledBy="filter-kategori-label" value={draft.category||'Semua kategori'} onChange={value=>updateDraft({category:value==='Semua kategori'?'':value})} options={[{value:'Semua kategori',label:'Semua kategori'},...initialCategories.filter(item=>item.active).map(item=>({value:item.name,label:item.name}))]}/>
+      </div>
+      <div className="filter-field">
+        <span className="filter-label" id="filter-status-label">Status</span>
+        <Dropdown label="Filter status" labelledBy="filter-status-label" value={draft.status||'Semua status'} onChange={value=>updateDraft({status:value==='Semua status'?'':value as Status})} options={[{value:'Semua status',label:'Semua status'},...publicStatuses.map(status=>({value:status,label:statusInfo[status].text}))]}/>
+      </div>
+      <div className="listing-actions">
+        <Button type="submit">Terapkan filter</Button>
+        <Button type="button" variant="outline" onClick={resetFilters}>Reset</Button>
+      </div>
+    </form>
+    {result.total===0
+      ? <div className="empty-state listing-empty">
+          <SearchX size={32} aria-hidden="true"/>
+          <h2>Tidak ada laporan yang cocok</h2>
+          <p>Coba kata kunci lain atau atur ulang filter untuk melihat laporan lain.</p>
+          <Button variant="outline" onClick={resetFilters}>Reset filter</Button>
+        </div>
+      : <>
+          <div className="listing-grid">
+            {result.items.map(report=><ReportListCard key={report.code} report={toCard(report)}/>)}
+          </div>
+          <nav className="pagination listing-pagination" aria-label="Halaman laporan">
+            <p className="listing-range" aria-live="polite">Menampilkan {result.start}–{result.end} dari {result.total} laporan</p>
+            {result.pageCount>1&&<div className="pagination-pages">
+              {reportPageWindow(result.page,result.pageCount).map((page,index)=>page==='gap'
+                ? <span className="pagination-gap" key={`gap-${index}`} aria-hidden="true">…</span>
+                : <button type="button" key={page} className={page===result.page?'current-page':''} aria-current={page===result.page?'page':undefined} aria-label={`Halaman ${page}`} onClick={()=>goToPage(page)}>{page}</button>)}
+            </div>}
+          </nav>
+          <div className="listing-notice"><Info size={18} aria-hidden="true"/><p>Laporan yang tampil sudah ditinjau administrator. Identitas pelapor tidak ditampilkan di ruang publik.</p></div>
+        </>}
+  </main></AppShell>
+}
 
 export function Detail(){
   const {code=''}=useParams()

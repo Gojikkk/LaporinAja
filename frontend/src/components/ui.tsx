@@ -73,15 +73,38 @@ export function Footer(){
 
 export function AppShell({children, mode='public', footer=true, pageClass=''}: {children:ReactNode;mode?:'public'|'reporter'|'admin';footer?:boolean;pageClass?:string}){return <div className={`app-theme app-${mode} ${pageClass}`.trim()}><Header mode={mode}/>{children}{footer&&<Footer/>}</div>}
 
-export function PageIntro({title,description,action}:{title:string;description:string;action?:ReactNode}){return <div className="page-intro"><div><h1>{title}</h1><p>{description}</p></div>{action&&<div className="intro-action">{action}</div>}</div>}
+export function PageIntro({title,description,action,eyebrow}:{title:string;description:string;action?:ReactNode;eyebrow?:string}){return <div className="page-intro"><div>{eyebrow&&<div className="eyebrow"><span aria-hidden="true"/>{eyebrow}</div>}<h1>{title}</h1><p>{description}</p></div>{action&&<div className="intro-action">{action}</div>}</div>}
 
 export function ReportCard({report}: {report:Report}) { return <article className="report-card"><Link to={`/laporan/${report.code}`} className={`report-art ${report.tone}`} aria-label={`Lihat laporan: ${report.title}`}><span className="art-symbol"><CategoryIcon category={report.category} size={30}/></span><span className="art-code">{report.code}</span></Link><div className="report-card-body"><div className="card-meta"><span>{report.category}</span><span className="meta-dot"/><span>{report.date}</span></div><Link className="report-title" to={`/laporan/${report.code}`}>{report.title}</Link><div className="report-place"><MapPin size={14}/>{report.village}, {report.district}</div><div className="card-bottom"><StatusBadge status={report.status}/><Link className="round-link" to={`/laporan/${report.code}`} aria-label={`Buka laporan ${report.code}`}><ArrowUpRight size={17}/></Link></div></div></article> }
+
+/** Varian kartu horizontal untuk daftar /laporan (desain 768 ke atas). */
+export function ReportListCard({report}: {report:Report}) { return <article className="report-card report-card-row"><Link to={`/laporan/${report.code}`} className={`report-art ${report.tone}`} aria-label={`Lihat laporan: ${report.title}`}><span className="art-symbol"><CategoryIcon category={report.category} size={32}/></span><span className="art-code">{report.code}</span></Link><div className="report-card-body"><span className="report-category">{report.category}</span><Link className="report-title" to={`/laporan/${report.code}`}>{report.title}</Link><div className="report-place"><MapPin size={14}/>{report.village}, {report.district}</div><span className="report-date">{report.date}</span><div className="report-status"><StatusBadge status={report.status}/></div></div></article> }
 
 export function StatCard({label,value,detail,icon}:{label:string;value:string;detail:string;icon:ReactNode}){return <article className="stat-card"><div className="stat-top"><span>{label}</span><i>{icon}</i></div><div className="stat-value">{value}</div><div className="stat-detail">{detail}</div></article>}
 
 export type TimelineEntry = { at:string; title:string; note:string }
 
-export function Dropdown({label,value,options,onChange,icon}:{label:string;value:string;options:{value:string;label:string}[];onChange:(v:string)=>void;icon?:ReactNode}){const [open,setOpen]=useState(false);const ref=useRef<HTMLDivElement>(null);useEffect(()=>{if(!open)return;const close=(e:MouseEvent)=>{if(ref.current&&!(e.target as Node).contains(ref.current))setOpen(false)};document.addEventListener('mousedown',close);return()=>document.removeEventListener('mousedown',close)},[open]);return <div className="select-field" ref={ref}>{icon}<button type="button" className="select-trigger" onClick={()=>setOpen(!open)} aria-haspopup="listbox" aria-expanded={open}><span>{value}</span><ChevronDown size={15} className={open?'select-chev open':'select-chev'}/></button>{open&&<div className="select-menu" role="listbox">{options.map(o=><button key={o.value} type="button" role="option" aria-selected={o.value===value} className={`select-option ${o.value===value?'selected':''}`} onClick={()=>{onChange(o.value);setOpen(false)}}>{o.label}</button>)}</div>}</div>}
+export function Dropdown({label,value,options,onChange,icon,labelledBy}:{label:string;value:string;options:{value:string;label:string}[];onChange:(v:string)=>void;icon?:ReactNode;labelledBy?:string}){
+  const [open,setOpen]=useState(false)
+  const ref=useRef<HTMLDivElement>(null)
+  useEffect(()=>{
+    if(!open) return
+    const close=(e:MouseEvent)=>{if(ref.current&&!(e.target as Node).contains(ref.current))setOpen(false)}
+    document.addEventListener('mousedown',close)
+    return()=>document.removeEventListener('mousedown',close)
+  },[open])
+  const selected=options.find(o=>o.value===value)?.label??value
+  return <div className="select-field" ref={ref}>
+    {icon}
+    <button type="button" className="select-trigger" onClick={()=>setOpen(!open)} aria-label={labelledBy?undefined:label} aria-labelledby={labelledBy} aria-haspopup="listbox" aria-expanded={open}>
+      <span>{selected}</span>
+      <ChevronDown size={15} className={open?'select-chev open':'select-chev'}/>
+    </button>
+    {open&&<div className="select-menu" role="listbox" aria-labelledby={labelledBy}>
+      {options.map(o=><button key={o.value} type="button" role="option" aria-selected={o.value===value} className={`select-option ${o.value===value?'selected':''}`} onClick={()=>{onChange(o.value);setOpen(false)}}>{o.label}</button>)}
+    </div>}
+  </div>
+}
 
 export function Timeline({report,history}:{report:Report;history?:TimelineEntry[]}){if(history?.length)return <div className="timeline">{history.map((entry,i)=><div className="timeline-item done" key={`${entry.at}-${i}`}><span className="timeline-dot"><Check size={13}/></span><div><div className="timeline-title">{entry.title}</div><p>{entry.note}</p><small>{entry.at}</small></div></div>)}</div>;return <div className="timeline"><div className="timeline-item done"><span className="timeline-dot"><Check size={13}/></span><div><div className="timeline-title">Laporan dicatat</div><p>Laporan diterima oleh sistem.</p><small>{report.date}</small></div></div></div>}
 

@@ -881,3 +881,83 @@ export function latestNote(report: AdminReport) {
   return report.history[report.history.length - 1]
 }
 
+/* ------------------------------------------------------------------------- */
+/* Filter dan pagination daftar publik                                       */
+/* Helper murni supaya halaman /laporan tetap memakai demo store sekarang    */
+/* dan bisa diganti sumber API tanpa mengubah logika tampilan.               */
+/* ------------------------------------------------------------------------- */
+
+export const REPORT_PAGE_SIZE = 6
+
+export type ReportQuery = {
+  q?: string
+  /** Nama kategori, bukan slug. Pemanggil yang memetakan slug dari URL. */
+  category?: string
+  status?: Status
+}
+
+/** Menyaring laporan publik berdasarkan kata kunci, kategori, dan status. */
+export function filterPublicReports(rows: AdminReport[], query: ReportQuery) {
+  const keyword = query.q?.trim().toLocaleLowerCase('id-ID') ?? ''
+  return rows.filter((report) => {
+    if (query.category && report.category !== query.category) return false
+    if (query.status && report.status !== query.status) return false
+    if (!keyword) return true
+    return `${report.title} ${report.city} ${report.village} ${report.district} ${report.code}`
+      .toLocaleLowerCase('id-ID')
+      .includes(keyword)
+  })
+}
+
+export function reportPageCount(total: number, pageSize = REPORT_PAGE_SIZE) {
+  return total > 0 ? Math.ceil(total / pageSize) : 0
+}
+
+/** Halaman selalu berada di rentang 1..pageCount agar URL tidak menyesatkan. */
+export function clampReportPage(page: number, pageCount: number) {
+  const last = Math.max(1, pageCount)
+  const safe = Number.isFinite(page) ? Math.trunc(page) : 1
+  return Math.min(Math.max(1, safe), last)
+}
+
+/** Nomor halaman yang tampil, dengan 'gap' sebagai penanda elipsis. */
+export function reportPageWindow(page: number, pageCount: number, max = 5): (number | 'gap')[] {
+  if (pageCount <= max + 2) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1)
+  }
+  const half = Math.floor(max / 2)
+  let start = Math.max(1, page - half)
+  let end = start + max - 1
+  if (end > pageCount) {
+    end = pageCount
+    start = end - max + 1
+  }
+  const pages: (number | 'gap')[] = []
+  if (start > 1) {
+    pages.push(1)
+    if (start > 2) pages.push('gap')
+  }
+  for (let current = start; current <= end; current += 1) pages.push(current)
+  if (end < pageCount) {
+    if (end < pageCount - 1) pages.push('gap')
+    pages.push(pageCount)
+  }
+  return pages
+}
+
+export function paginatePublicReports(rows: AdminReport[], page: number, pageSize = REPORT_PAGE_SIZE) {
+  const total = rows.length
+  const pageCount = reportPageCount(total, pageSize)
+  const safePage = clampReportPage(page, pageCount)
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const end = Math.min(safePage * pageSize, total)
+  return {
+    items: total === 0 ? [] : rows.slice((safePage - 1) * pageSize, end),
+    page: safePage,
+    pageCount,
+    start,
+    end,
+    total,
+  }
+}
+
