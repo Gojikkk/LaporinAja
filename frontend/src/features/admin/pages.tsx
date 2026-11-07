@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
-  ChevronDown,
   CircleAlert,
   CircleCheck,
   CircleHelp,
@@ -24,6 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import type { Status } from '../../shared/report-data'
+import { Dropdown } from '../../components/ui'
 import { AdminShell, useAdminTitle } from './shell'
 import {
   adminCategories,
@@ -316,42 +316,30 @@ export function AdminQueue() {
       <form className="adm-filter-card" onSubmit={applyFilters}>
         <div className="adm-field">
           <span id="adm-status-label">Status</span>
-          <div className="adm-select-wrap">
-            <select
-              className={draftStatus === 'ALL' ? 'adm-select is-placeholder' : 'adm-select'}
-              aria-labelledby="adm-status-label"
-              value={draftStatus}
-              onChange={(event) => setDraftStatus(event.target.value as Status | 'ALL')}
-            >
-              <option value="ALL">Semua status</option>
-              {STATUSES.map((status) => (
-                <option value={status} key={status}>
-                  {adminStatus[status].label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={20} aria-hidden="true" />
-          </div>
+          <Dropdown
+            label="Status"
+            labelledBy="adm-status-label"
+            value={draftStatus}
+            onChange={(value) => setDraftStatus(value as Status | 'ALL')}
+            options={[
+              { value: 'ALL', label: 'Semua status' },
+              ...STATUSES.map((status) => ({ value: status, label: adminStatus[status].label })),
+            ]}
+          />
         </div>
 
         <div className="adm-field">
           <span id="adm-category-label">Kategori</span>
-          <div className="adm-select-wrap">
-            <select
-              className={draftCategory === 'ALL' ? 'adm-select is-placeholder' : 'adm-select'}
-              aria-labelledby="adm-category-label"
-              value={draftCategory}
-              onChange={(event) => setDraftCategory(event.target.value)}
-            >
-              <option value="ALL">Semua kategori</option>
-              {adminCategories.map((category) => (
-                <option value={category} key={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={20} aria-hidden="true" />
-          </div>
+          <Dropdown
+            label="Kategori"
+            labelledBy="adm-category-label"
+            value={draftCategory}
+            onChange={setDraftCategory}
+            options={[
+              { value: 'ALL', label: 'Semua kategori' },
+              ...adminCategories.map((category) => ({ value: category, label: category })),
+            ]}
+          />
         </div>
 
         <button type="submit" className="adm-btn">

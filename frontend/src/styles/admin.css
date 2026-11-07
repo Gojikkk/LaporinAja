@@ -825,6 +825,208 @@ html:has(.adm)::-webkit-scrollbar {
   pointer-events: none;
 }
 
+/* Dropdown kustom: panel opsi mengikuti bahasa desain admin, bukan popup
+   bawaan browser pada <select>. */
+
+.adm .select-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 0;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--adm-ink);
+}
+
+.adm .select-trigger {
+  flex: 1;
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--adm-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--adm-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 150%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.adm .select-trigger:hover {
+  border-color: #cbd5e1;
+}
+
+.adm .select-trigger[aria-expanded='true'] {
+  border-color: var(--adm-teal);
+}
+
+.adm .select-chev {
+  flex: none;
+  color: var(--adm-body);
+  transition: transform 0.2s ease;
+}
+
+.adm .select-chev.open {
+  transform: rotate(180deg);
+}
+
+.adm .select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 280px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--adm-line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  animation: menu-in 0.18s ease backwards;
+}
+
+.adm .select-option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--adm-body);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.adm .select-option:hover,
+.adm .select-option.selected {
+  background: var(--adm-teal-soft);
+  color: var(--adm-teal);
+}
+
+/* Pemilih ikon kategori: panel pilihan ikut mengalir di dalam dialog agar
+   tidak terpotong oleh area gulir dialog. */
+
+.adm-icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.adm-icon-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--adm-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--adm-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 155%;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.adm-icon-trigger:hover {
+  border-color: #cbd5e1;
+}
+
+.adm-icon-trigger[aria-expanded='true'] {
+  border-color: var(--adm-teal);
+}
+
+.adm-icon-trigger-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.adm-icon-glyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--adm-teal-soft);
+  color: var(--adm-teal);
+}
+
+.adm-icon-chev {
+  flex: none;
+  color: var(--adm-body);
+  transition: transform 0.2s ease;
+}
+
+.adm-icon-chev.open {
+  transform: rotate(180deg);
+}
+
+.adm-icon-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--adm-line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+.adm-icon-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--adm-body);
+  font: inherit;
+  font-size: 13px;
+  line-height: 145%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.adm-icon-option-glyph {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--adm-teal);
+}
+
+.adm-icon-option:hover,
+.adm-icon-option.selected {
+  background: var(--adm-teal-soft);
+  color: var(--adm-teal);
+}
+
+@media (max-width: 420px) {
+  .adm-icon-menu {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* -------------------------------------------------------------- pagination */
 
 .adm-pagination {
