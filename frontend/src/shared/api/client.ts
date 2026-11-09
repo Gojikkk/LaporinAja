@@ -15,19 +15,38 @@ function readableCookie(name: string) {
   return document.cookie.split('; ').find(part => part.startsWith(prefix))?.slice(prefix.length) ?? ''
 }
 
+function isAuthBootstrapRequest(path: string) {
+  return /^\/?auth\/(login|register|google)(?:[/?#]|$)/.test(path)
+}
+
+function isLogoutRequest(path: string) {
+  return /^\/?auth\/logout(?:[/?#]|$)/.test(path)
+}
+
 /** Session is exclusively an HttpOnly server cookie. This client never stores session tokens. */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   const method = (init.method ?? 'GET').toUpperCase()
   const mutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
+  if (mutating && isAuthBootstrapRequest(path)) csrfToken = ''
   // Browser supplies Origin. If the API has a readable CSRF cookie, mirror its configured header.
-  if (mutating && CSRF_ENDPOINT && !csrfToken) {
+  if (mutating && CSRF_ENDPOINT && !csrfToken && !isAuthBootstrapRequest(path)) {
     try {
       const csrfResponse = await fetch(`${API_URL}${CSRF_ENDPOINT.startsWith('/') ? CSRF_ENDPOINT : `/${CSRF_ENDPOINT}`}`, { credentials: 'include' })
-      const csrfPayload = await csrfResponse.json().catch(() => ({}))
-      if (csrfResponse.ok) csrfToken = csrfPayload?.data?.csrfToken ?? csrfPayload?.csrfToken ?? ''
-    } catch { /* The write request below will surface the consistent network error. */ }
+      if (csrfResponse.status !== 401) {
+        const csrfPayload = await csrfResponse.json().catch(() => ({}))
+        if (!csrfResponse.ok) {
+          const error: ApiErrorBody = csrfPayload?.error ?? {}
+          throw new ApiError(csrfResponse.status, error.code ?? 'REQUEST_FAILED', error.message ?? 'Permintaan belum berhasil. Coba lagi.', error.fields)
+        }
+        csrfToken = csrfPayload?.data?.csrfToken ?? csrfPayload?.csrfToken ?? ''
+        if (!csrfToken) throw new ApiError(0, 'CSRF_TOKEN_MISSING', 'Token keamanan tidak tersedia. Muat ulang halaman lalu coba lagi.')
+      }
+    } catch (error) {
+      if (error instanceof ApiError) throw error
+      throw new ApiError(0, 'NETWORK_ERROR', 'Tidak dapat terhubung ke layanan. Periksa koneksi Anda lalu coba lagi.')
+    }
   }
   const csrf = mutating ? (csrfToken || readableCookie(CSRF_COOKIE)) : ''
   if (csrf) headers.set(CSRF_HEADER, decodeURIComponent(csrf))
@@ -38,6 +57,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       const error: ApiErrorBody = payload?.error ?? {}
       throw new ApiError(response.status, error.code ?? 'REQUEST_FAILED', error.message ?? 'Permintaan belum berhasil. Coba lagi.', error.fields)
     }
+    if (isLogoutRequest(path)) csrfToken = ''
     return payload as T
   } catch (error) {
     if (error instanceof ApiError) throw error

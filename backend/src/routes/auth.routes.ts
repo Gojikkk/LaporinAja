@@ -17,6 +17,7 @@ const authRateLimit = rateLimit({
 authRoutes.post("/register", authRateLimit, authController.register);
 authRoutes.post("/login", authRateLimit, authController.login);
 authRoutes.post("/google", authRateLimit, authController.loginGoogle);
+authRoutes.get("/csrf", requireAuth, authController.csrf);
 authRoutes.post("/logout", requireAuth, requireCsrf, authController.logout);
 authRoutes.get("/me", requireAuth, authController.me);
 

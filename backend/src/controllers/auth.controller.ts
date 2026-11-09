@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
-import { clearSessionCookies, setSessionCookies } from "../middlewares/auth";
+import { clearSessionCookies, getCsrfToken, setSessionCookies } from "../middlewares/auth";
 import { loginUser, loginWithGoogle, registerUser, revokeCurrentSession } from "../services/auth.service";
+import { HttpError } from "../utils/http-error";
 import { sendData } from "../utils/responses";
 import { parseBody } from "../utils/validation";
 import { z } from "zod";
@@ -48,4 +49,12 @@ export const me: RequestHandler = (request, response) => {
     name: request.user!.name,
     role: request.user!.role
   });
+};
+
+export const csrf: RequestHandler = (request, response) => {
+  const csrfToken = getCsrfToken(request);
+  if (!csrfToken) {
+    throw new HttpError(403, "CSRF_INVALID", "Token CSRF tidak valid");
+  }
+  sendData(response, { csrfToken });
 };

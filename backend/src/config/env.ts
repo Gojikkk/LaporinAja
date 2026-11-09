@@ -15,6 +15,16 @@ if (!Number.isSafeInteger(sessionTtlDays) || sessionTtlDays < 1) {
   throw new Error("SESSION_TTL_DAYS must be a positive integer");
 }
 
+const configuredSessionCookieSameSite = (process.env.SESSION_COOKIE_SAME_SITE ?? "lax").toLowerCase();
+if (configuredSessionCookieSameSite !== "lax" && configuredSessionCookieSameSite !== "none") {
+  throw new Error("SESSION_COOKIE_SAME_SITE must be either lax or none");
+}
+const sessionCookieSameSite: "lax" | "none" = configuredSessionCookieSameSite;
+const sessionCookieSecure = process.env.SESSION_COOKIE_SECURE === "true";
+if (sessionCookieSameSite === "none" && !sessionCookieSecure) {
+  throw new Error("SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_SAME_SITE is none");
+}
+
 const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME;
 if (!cloudinaryCloudName) {
   throw new Error("CLOUDINARY_CLOUD_NAME is required");
@@ -53,7 +63,8 @@ export const env = {
     .filter(Boolean),
   sessionSecret,
   googleClientId: process.env.GOOGLE_CLIENT_ID,
-  sessionCookieSecure: process.env.SESSION_COOKIE_SECURE === "true",
+  sessionCookieSecure,
+  sessionCookieSameSite,
   sessionTtlDays,
   maxUploadRequestBytes,
   cloudinaryCloudName,
