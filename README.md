@@ -91,9 +91,15 @@ Setelah kedua service web dibuat, set:
 - Jika URL Render yang diberikan berbeda dari default di atas, ubah `FRONTEND_ORIGINS` pada API ke origin frontend staging persis (tanpa trailing slash), dan `VITE_API_URL` pada frontend ke URL API staging ditambah `/api`.
 - Biarkan `VITE_CSRF_ENDPOINT=/auth/csrf`, `SESSION_COOKIE_SECURE=true`, dan `SESSION_COOKIE_SAME_SITE=none` untuk HTTPS staging.
 
-Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan saat API start; data demo tidak di-seed otomatis. Di plan Free, Shell service API tidak tersedia, jadi buat akun uji lewat halaman registrasi. Gunakan database dan kredensial staging yang terpisah dari production.
+Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan saat API start; Render tidak men-seed data demo otomatis. Di plan Free, Shell service API tidak tersedia, jadi buat akun uji lewat halaman registrasi. Gunakan database dan kredensial staging yang terpisah dari production.
 
 **Batasan plan Free:** API akan sleep setelah 15 menit tanpa trafik dan perlu sekitar satu menit untuk bangun saat ada request. Database Free dibatasi 1 GB dan otomatis kedaluwarsa setelah 30 hari; data database akan dihapus setelah masa tenggang jika tidak di-upgrade. Static Site gratis. Cek pemakaian bandwidth/build dan spend limit di dashboard Render agar tidak kena biaya tambahan.
+
+### Preview publik sementara tanpa kartu
+
+Di Windows, jalankan `Start-Staging.bat` dari root repository. Script menyalakan Docker Desktop jika perlu, database staging lokal, API, frontend, dan Cloudflare Quick Tunnel. Untuk cek kebutuhan tanpa menyalakan preview, jalankan `.\start-staging.ps1 -CheckOnly`. URL publik serta akun admin demo akan ditampilkan di terminal. Pada database baru, script mengisi data demo dengan password admin acak yang disimpan di `%LOCALAPPDATA%\LaporinAja\staging-admin-password.txt`; jangan bagikan. Biarkan terminal tetap terbuka selama preview dipakai, lalu tekan `Ctrl+C` untuk berhenti. Database preview tetap tersimpan di Docker volume lokal.
+
+Quick Tunnel memberikan URL sementara yang berubah saat dimulai ulang. Preview publik bukan deployment permanen; laptop dan koneksi internet harus aktif. Gunakan hanya data dummy karena siapa pun yang punya URL dapat mengakses preview.
 
 ## Progress saat ini
 

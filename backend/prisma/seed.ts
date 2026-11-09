@@ -16,20 +16,20 @@ const categories = [
 
 // ---------------------------------------------------------------------------
 // Demo users
-// Passwords are intentionally simple for demo purposes only.
-// Never use these credentials in a production environment.
+// Demo credentials are for non-production use only. Staging can override the admin password.
 // ---------------------------------------------------------------------------
 
 const ADMIN_ID    = "00000000-0000-0000-0000-000000000001";
 const PELAPOR1_ID = "00000000-0000-0000-0000-000000000002";
 const PELAPOR2_ID = "00000000-0000-0000-0000-000000000003";
+const adminPassword = process.env.ADMIN_DEMO_PASSWORD ?? "Admin1234!";
 
 const demoUsers = [
   {
     id: ADMIN_ID,
     name: "Admin Demo",
     email: "admin@demo.test",
-    password: "Admin1234!",
+    password: adminPassword,
     role: "ADMIN" as const,
   },
   {
@@ -627,7 +627,7 @@ async function main(): Promise<void> {
   console.log("✓ demo reports seeded (18 laporan)");
   console.log("");
   console.log("Demo accounts:");
-  console.log("  admin@demo.test   / Admin1234!  (ADMIN)");
+  console.log(`  admin@demo.test   / ${adminPassword}  (ADMIN)`);
   console.log("  budi@demo.test    / Budi1234!   (PELAPOR)");
   console.log("  siti@demo.test    / Siti1234!   (PELAPOR)");
 }

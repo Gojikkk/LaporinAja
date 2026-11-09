@@ -45,7 +45,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
     ports:
-      - "${PORT:-3000}:3000"
+      - "${API_PUBLISHED_PORT:-3000}:3000"
     healthcheck:
       test:
         [
