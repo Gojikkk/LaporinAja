@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, NavLink } from 'react-router-dom'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Bell, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, Copy, Droplets, FileCheck2, FilePlus2, Filter, ImagePlus, Info, Lamp, LayoutDashboard, Link2, ListFilter, LockKeyhole, LogIn, MapPin, Menu, MessageSquareText, MoreHorizontal, Route, Search, Shapes, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, Users, X } from 'lucide-react'
-import { statusInfo, type Report, type Status } from '../shared/report-data'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Bell, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, Copy, Droplets, FileCheck2, FilePlus2, Filter, ImagePlus, Info, Lamp, LayoutDashboard, Link2, ListFilter, LockKeyhole, LogIn, MapPin, Menu, MessageSquareText, MoreHorizontal, Route, Search, Shapes, ShieldCheck, SlidersHorizontal, Sparkles, TrafficCone, Trash2, Trees, Users, Waves, X } from 'lucide-react'
+import { statusInfo, categoryIconName, type Report, type Status } from '../shared/report-data'
+import { mediaSrc } from '../shared/api/client'
+import { useSession } from '../shared/session'
+import { NotificationBell } from './notifications'
 
-const categoryIcons = { 'Jalan rusak': Route, 'Lampu jalan': Lamp, Sampah: Trash2, 'Saluran air': Droplets, 'Fasilitas umum': Building2, Lainnya: Shapes }
+const iconByKey = {
+  route: Route,
+  lamp: Lamp,
+  trash: Trash2,
+  droplets: Droplets,
+  building: Building2,
+  trees: Trees,
+  traffic: TrafficCone,
+  shield: ShieldCheck,
+  sparkles: Sparkles,
+  waves: Waves,
+  construction: Route,
+  shapes: Shapes,
+} as const
 
-export function CategoryIcon({ category, size=22 }: { category:string; size?:number }) { const Icon = categoryIcons[category as keyof typeof categoryIcons] ?? Shapes; return <Icon size={size} strokeWidth={1.8} aria-hidden="true"/> }
+export function CategoryIcon({ category, size=22 }: { category:string; size?:number }) { const Icon = iconByKey[categoryIconName(category) as keyof typeof iconByKey] ?? Shapes; return <Icon size={size} strokeWidth={1.8} aria-hidden="true"/> }
 export function StatusBadge({ status }: { status: Status }) { const s=statusInfo[status], Icon=s.icon; return <span className={`badge ${s.cls}`}><Icon size={14} strokeWidth={2.2} aria-hidden="true"/><span>{s.text}</span></span> }
 
 export function PrimaryReportCard({ report, primary }: { report:Report; primary?:Report }) {
@@ -49,10 +65,54 @@ export function Toast({ message, onClose }: { message:string; onClose:()=>void }
 
 export function Modal({ title, children, onClose }: { title:string; children:ReactNode; onClose:()=>void }) { useEffect(()=>{const close=(e:KeyboardEvent)=>e.key==='Escape'&&onClose();window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[onClose]); return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button className="icon-button modal-close" aria-label="Tutup dialog" onClick={onClose}><X size={19}/></button><div className="modal-mark"><Info size={20}/></div><h2 id="modal-title">{title}</h2>{children}</section></div> }
 
+function AccountMenu({ mode }: { mode: 'reporter' | 'admin' }) {
+  const { user, logout } = useSession()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  const name = user?.name ?? (mode === 'admin' ? 'Admin' : 'Pelapor')
+
+  async function handleLogout() {
+    setOpen(false)
+    await logout()
+    navigate('/masuk')
+  }
+
+  return (
+    <div className="account-wrap" ref={ref}>
+      <button className="profile-button" aria-label="Menu akun" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>
+        <span>{name}</span>
+        <ChevronDown size={15}/>
+      </button>
+      {open && (
+        <div className="account-menu" role="menu" aria-label="Menu akun">
+          <div className="account-menu-head">
+            <b>{name}</b>
+            <small>{mode === 'admin' ? 'Administrator' : 'Pelapor'}</small>
+          </div>
+          <Link to={mode === 'admin' ? '/admin' : '/dashboard'} onClick={() => setOpen(false)}>Ruang kerja</Link>
+          <button type="button" onClick={handleLogout}>Keluar</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Header({ mode='public' }: { mode?:'public'|'reporter'|'admin' }) {
   const [open,setOpen]=useState(false)
-  const links=mode==='public'?[['/','Beranda'],['/laporan','Laporan'],['/statistik','Statistik'],['/tentang','Tentang']]:mode==='admin'?[['/admin','Ringkasan'],['/admin/laporan','Semua laporan'],['/admin/statistik','Statistik']]:[['/dashboard','Ringkasan'],['/dashboard','Laporan saya']]
-  return <header className="topbar"><div className="nav-wrap"><Link to="/" className="brand" aria-label="LaporinAja, beranda"><span className="brand-mark"><MapPin size={18} fill="currentColor"/></span><span>Laporin<span>Aja</span></span></Link><button className="icon-button mobile-menu" aria-label={open?'Tutup navigasi':'Buka navigasi'} aria-expanded={open} onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button><nav className={`main-nav ${open?'nav-open':''}`} aria-label="Navigasi utama">{links.map(([to,label])=><NavLink end={to==='/' || to==='/dashboard' || to==='/admin'} onClick={()=>setOpen(false)} key={label} to={to} className={({isActive})=>isActive?'nav-link active':'nav-link'}>{label}</NavLink>)}{mode==='admin'&&<span className="role-pill"><ShieldCheck size={14}/> Administrator</span>}{mode==='reporter'&&<span className="role-pill"><Users size={14}/> Pelapor</span>}<div className="nav-actions">{mode==='public'?<><Button to="/masuk" variant="quiet">Masuk</Button><Button to="/daftar" icon={<ArrowRight size={16}/>}>Lapor</Button></>:<><button className="icon-button notice-button" aria-label="Notifikasi"><Bell size={18}/><i/></button><button className="profile-button" aria-label="Menu akun"><span className="avatar">{mode==='admin'?'A':'R'}</span><span>{mode==='admin'?'Admin':'Rani'}</span><ChevronDown size={15}/></button></>}</div></nav></div></header>
+  const links=mode==='public'?[['/','Beranda'],['/laporan','Laporan'],['/statistik','Statistik'],['/tentang','Tentang']]:mode==='admin'?[['/admin','Ringkasan'],['/admin/laporan','Semua laporan'],['/admin/statistik','Statistik']]:[['/dashboard','Ringkasan'],['/lapor/baru','Buat laporan']]
+  return <header className="topbar"><div className="nav-wrap"><Link to="/" className="brand" aria-label="LaporinAja, beranda"><span className="brand-mark"><MapPin size={18} fill="currentColor"/></span><span>Laporin<span>Aja</span></span></Link><button className="icon-button mobile-menu" aria-label={open?'Tutup navigasi':'Buka navigasi'} aria-expanded={open} onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button><nav className={`main-nav ${open?'nav-open':''}`} aria-label="Navigasi utama">{links.map(([to,label])=><NavLink end={to==='/' || to==='/dashboard' || to==='/admin'} onClick={()=>setOpen(false)} key={label} to={to} className={({isActive})=>isActive?'nav-link active':'nav-link'}>{label}</NavLink>)}{mode==='admin'&&<span className="role-pill"><ShieldCheck size={14}/> Administrator</span>}{mode==='reporter'&&<span className="role-pill"><Users size={14}/> Pelapor</span>}<div className="nav-actions">{mode==='public'?<><Button to="/masuk" variant="quiet">Masuk</Button><Button to="/daftar" icon={<ArrowRight size={16}/>}>Lapor</Button></>:mode==='reporter'?<><NotificationBell mode="reporter"/><AccountMenu mode="reporter"/></>:<AccountMenu mode="admin"/>}</div></nav></div></header>
 }
 
 export function Footer(){
@@ -75,10 +135,10 @@ export function AppShell({children, mode='public', footer=true, pageClass=''}: {
 
 export function PageIntro({title,description,action,eyebrow}:{title:string;description:string;action?:ReactNode;eyebrow?:string}){return <div className="page-intro"><div>{eyebrow&&<div className="eyebrow"><span aria-hidden="true"/>{eyebrow}</div>}<h1>{title}</h1><p>{description}</p></div>{action&&<div className="intro-action">{action}</div>}</div>}
 
-export function ReportCard({report}: {report:Report}) { return <article className="report-card"><Link to={`/laporan/${report.code}`} className={`report-art ${report.tone}`} aria-label={`Lihat laporan: ${report.title}`}><span className="art-symbol"><CategoryIcon category={report.category} size={30}/></span><span className="art-code">{report.code}</span></Link><div className="report-card-body"><div className="card-meta"><span>{report.category}</span><span className="meta-dot"/><span>{report.date}</span></div><Link className="report-title" to={`/laporan/${report.code}`}>{report.title}</Link><div className="report-place"><MapPin size={14}/>{report.village}, {report.district}</div><div className="card-bottom"><StatusBadge status={report.status}/><Link className="round-link" to={`/laporan/${report.code}`} aria-label={`Buka laporan ${report.code}`}><ArrowUpRight size={17}/></Link></div></div></article> }
+export function ReportCard({report}: {report:Report}) { return <article className="report-card"><Link to={`/laporan/${report.code}`} className={`report-art ${report.tone}`} aria-label={`Lihat laporan: ${report.title}`}>{report.thumbnailUrl ? <img className="report-thumb" src={mediaSrc(report.thumbnailUrl)} alt="" loading="lazy"/> : <span className="art-symbol"><CategoryIcon category={report.category} size={30}/></span>}<span className="art-code">{report.code}</span></Link><div className="report-card-body"><div className="card-meta"><span>{report.category}</span><span className="meta-dot"/><span>{report.date}</span></div><Link className="report-title" to={`/laporan/${report.code}`}>{report.title}</Link><div className="report-place"><MapPin size={14}/>{report.village}, {report.district}</div><div className="card-bottom"><StatusBadge status={report.status}/><Link className="round-link" to={`/laporan/${report.code}`} aria-label={`Buka laporan ${report.code}`}><ArrowUpRight size={17}/></Link></div></div></article> }
 
 /** Varian kartu horizontal untuk daftar /laporan (desain 768 ke atas). */
-export function ReportListCard({report}: {report:Report}) { return <article className="report-card report-card-row"><Link to={`/laporan/${report.code}`} className={`report-art ${report.tone}`} aria-label={`Lihat laporan: ${report.title}`}><span className="art-symbol"><CategoryIcon category={report.category} size={32}/></span><span className="art-code">{report.code}</span></Link><div className="report-card-body"><span className="report-category">{report.category}</span><Link className="report-title" to={`/laporan/${report.code}`}>{report.title}</Link><div className="report-place"><MapPin size={14}/>{report.village}, {report.district}</div><span className="report-date">{report.date}</span><div className="report-status"><StatusBadge status={report.status}/></div></div></article> }
+export function ReportListCard({report}: {report:Report}) { return <article className="report-card report-card-row"><Link to={`/laporan/${report.code}`} className={`report-art ${report.tone}`} aria-label={`Lihat laporan: ${report.title}`}>{report.thumbnailUrl ? <img className="report-thumb" src={mediaSrc(report.thumbnailUrl)} alt="" loading="lazy"/> : <span className="art-symbol"><CategoryIcon category={report.category} size={32}/></span>}<span className="art-code">{report.code}</span></Link><div className="report-card-body"><span className="report-category">{report.category}</span><Link className="report-title" to={`/laporan/${report.code}`}>{report.title}</Link><div className="report-place"><MapPin size={14}/>{report.village}, {report.district}</div><span className="report-date">{report.date}</span><div className="report-status"><StatusBadge status={report.status}/></div></div></article> }
 
 export function StatCard({label,value,detail,icon}:{label:string;value:string;detail:string;icon:ReactNode}){return <article className="stat-card"><div className="stat-top"><span>{label}</span><i>{icon}</i></div><div className="stat-value">{value}</div><div className="stat-detail">{detail}</div></article>}
 
