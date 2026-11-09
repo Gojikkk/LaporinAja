@@ -15,4 +15,4 @@ RUN npm run prisma:generate && npm run build
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npm run db:deploy && npm run db:seed && npm start"]
+CMD ["sh", "-c", "npm run db:deploy && npm start"]

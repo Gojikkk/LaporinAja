@@ -156,7 +156,13 @@ docker compose up --build
 
 Docker Compose will:
 1. Start PostgreSQL 17 and wait until it is healthy
-2. Build the API image, apply migrations, run seed, then start Express
+2. Build the API image, apply migrations, then start Express
+
+Seed demo data only when needed, and run it once after the API is ready:
+
+```sh
+docker compose exec api npm run db:seed
+```
 
 API: **http://localhost:3000** — PostgreSQL data persists in the `postgres_data` volume.
 
@@ -186,6 +192,7 @@ Copy `.env.example` to `.env` and fill in all required values.
 | `PORT` | | `3000` | API listen port |
 | `FRONTEND_ORIGINS` | | `http://localhost:5173` | Comma-separated allowed origins |
 | `SESSION_COOKIE_SECURE` | | `false` | Set `true` for HTTPS deployments |
+| `SESSION_COOKIE_SAME_SITE` | | `lax` | Use `none` with `SESSION_COOKIE_SECURE=true` when frontend and API are cross-site |
 | `SESSION_TTL_DAYS` | | `7` | Session lifetime in days |
 | `GOOGLE_CLIENT_ID` | | — | Required only for Google login |
 | `CLOUDINARY_FOLDER` | | `laporinaja` | Cloudinary upload folder |

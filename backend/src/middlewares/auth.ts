@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import type { RequestHandler, Response } from "express";
+import type { Request, RequestHandler, Response } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { prisma } from "../db";
@@ -33,7 +33,7 @@ function sessionCookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     secure: env.sessionCookieSecure,
-    sameSite: "lax" as const,
+    sameSite: env.sessionCookieSameSite,
     path: "/",
     maxAge
   };
@@ -81,7 +81,7 @@ export function clearSessionCookies(response: Response): void {
   response.clearCookie(CSRF_COOKIE, {
     httpOnly: false,
     secure: env.sessionCookieSecure,
-    sameSite: "lax",
+    sameSite: env.sessionCookieSameSite,
     path: "/"
   });
 }
@@ -91,6 +91,11 @@ function matchesCsrf(expectedHash: string, supplied: string | undefined): boolea
   const expected = Buffer.from(expectedHash, "hex");
   const actual = Buffer.from(hash(supplied), "hex");
   return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+export function getCsrfToken(request: Request): string | undefined {
+  const cookie = readCookie(request, CSRF_COOKIE);
+  return request.csrfHash && matchesCsrf(request.csrfHash, cookie) ? cookie : undefined;
 }
 
 export const requireAuth: RequestHandler = async (request, _response, next) => {

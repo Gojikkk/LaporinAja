@@ -40,7 +40,13 @@ cp backend/.env.example .env
 docker compose up --build
 ```
 
-API tersedia di `http://localhost:3000`; health check di `/health`. Untuk menghentikan layanan, jalankan `docker compose down`.
+API tersedia di `http://localhost:3000`; health check di `/health`. Jika perlu data demo, jalankan seed sekali setelah API siap:
+
+```sh
+docker compose exec api npm run db:seed
+```
+
+Seed tidak lagi berjalan otomatis saat container restart. Untuk menghentikan layanan, jalankan `docker compose down`.
 
 ### Opsi B: Jalankan backend secara lokal
 
@@ -75,6 +81,19 @@ npm run dev
 ```
 
 Vite menyediakan frontend di `http://localhost:5173`. URL API default adalah `http://localhost:3000/api`; ubah `VITE_API_URL` di `frontend/.env.local` jika backend berjalan di alamat lain. Build produksi frontend dapat dibuat dengan `npm run build` dari folder `frontend/`.
+
+## Deploy staging ke Render
+
+Repository menyediakan [Blueprint Render](./render.yaml) untuk PostgreSQL, API Docker, dan frontend static dengan plan Free. Dari Render, pilih **New → Blueprint** dan hubungkan repository. Blueprint memakai URL default `laporinaja-staging-web.onrender.com` dan `laporinaja-staging-api.onrender.com`; isi tiga kredensial Cloudinary saat diminta dan gunakan folder `laporinaja-staging`.
+
+Setelah kedua service web dibuat, set:
+
+- Jika URL Render yang diberikan berbeda dari default di atas, ubah `FRONTEND_ORIGINS` pada API ke origin frontend staging persis (tanpa trailing slash), dan `VITE_API_URL` pada frontend ke URL API staging ditambah `/api`.
+- Biarkan `VITE_CSRF_ENDPOINT=/auth/csrf`, `SESSION_COOKIE_SECURE=true`, dan `SESSION_COOKIE_SAME_SITE=none` untuk HTTPS staging.
+
+Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan saat API start; data demo tidak di-seed otomatis. Di plan Free, Shell service API tidak tersedia, jadi buat akun uji lewat halaman registrasi. Gunakan database dan kredensial staging yang terpisah dari production.
+
+**Batasan plan Free:** API akan sleep setelah 15 menit tanpa trafik dan perlu sekitar satu menit untuk bangun saat ada request. Database Free dibatasi 1 GB dan otomatis kedaluwarsa setelah 30 hari; data database akan dihapus setelah masa tenggang jika tidak di-upgrade. Static Site gratis. Cek pemakaian bandwidth/build dan spend limit di dashboard Render agar tidak kena biaya tambahan.
 
 ## Progress saat ini
 

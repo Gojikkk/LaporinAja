@@ -176,6 +176,7 @@ describe("API contract transport and authentication", () => {
     expect(allowed.status).toBe(204);
     expect(allowed.headers["access-control-allow-origin"]).toBe(frontend);
     expect(allowed.headers["access-control-allow-credentials"]).toBe("true");
+    expect(allowed.headers["access-control-allow-methods"]).toContain("PATCH");
 
     const blocked = await request(app).get("/api/categories").set("Origin", "https://attacker.example");
     expect(blocked.status).toBe(403);
@@ -191,6 +192,27 @@ describe("API contract transport and authentication", () => {
     });
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("ORIGIN_FORBIDDEN");
+  });
+
+  it("returns the authenticated session CSRF token for a separate frontend origin", async () => {
+    const response = await request(app)
+      .get("/api/auth/csrf")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie());
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe(frontend);
+    expect(response.body.data.csrfToken).toBe(csrfToken);
+  });
+
+  it("does not return a CSRF token when the readable cookie does not match the session", async () => {
+    const response = await request(app)
+      .get("/api/auth/csrf")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie().replace(csrfToken, "invalid-csrf-token"));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("CSRF_INVALID");
   });
 
   it("uses the standard field validation error envelope", async () => {
