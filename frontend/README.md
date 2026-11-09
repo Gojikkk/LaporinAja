@@ -15,7 +15,7 @@
 | Styling | CSS responsif kustom (tanpa UI library) |
 | Routing | React Router v6 (BrowserRouter) |
 | HTTP Client | Fetch API (`credentials: "include"`, CSRF-aware) |
-| State/Demo Data | In-memory store (`report-store.ts`) |
+| State/Data | API backend via `fetch` + typed endpoint wrapper |
 | Lingkungan | Node.js 20+ |
 
 ---
@@ -68,7 +68,7 @@ Frontend menyediakan UI untuk halaman dan alur berikut:
 | Halaman sistem (403 / 404) | ✅ | |
 | Responsif (mobile–desktop) | ✅ | Breakpoint 360px – 1400px |
 
-Data daftar/detail laporan dan dashboard masih menggunakan demo store in-memory di `src/shared/report-store.ts`. Client API dan beberapa form sudah tersedia; integrasi seluruh halaman dengan backend masih bertahap.
+Data daftar/detail laporan, dashboard pelapor, dan ruang admin dimuat langsung dari API backend. `src/shared/report-store.ts` hanya memetakan DTO API ke view model dan menyimpan helper tampilan.
 
 ---
 
@@ -100,7 +100,7 @@ src/
   vite-env.d.ts                 Vite environment types
 ```
 
-Routing, komponen bersama, data demo, dan layar peran berada di modul terpisah agar perubahan tiap bagian lebih mudah ditelusuri.
+Routing, komponen bersama, mapper data API, dan layar peran berada di modul terpisah agar perubahan tiap bagian lebih mudah ditelusuri.
 
 ## URL API per environment
 
@@ -108,7 +108,7 @@ Salin `.env.example` menjadi `.env.local` untuk lokal. URL default API lokal ada
 
 ```dotenv
 VITE_API_URL=https://api.example.test/api
-VITE_CSRF_COOKIE_NAME=csrfToken
+VITE_CSRF_COOKIE_NAME=laporinaja_csrf
 VITE_CSRF_HEADER_NAME=X-CSRF-Token
 # Alternative to a shared-domain readable CSRF cookie:
 VITE_CSRF_ENDPOINT=/auth/csrf
@@ -123,7 +123,7 @@ Vite membaca nilai `VITE_*` saat build. Atur URL sesuai environment dan bangun u
 - Browser mengirim `Origin` secara otomatis. Server Express perlu mengizinkan origin frontend secara eksplisit, mengaktifkan CORS `credentials: true`, menjawab preflight, dan memeriksa `Origin` untuk operasi mutasi. Jika server memakai token CSRF, terbitkan cookie CSRF yang dapat dibaca JavaScript dan set nama cookie/header di environment frontend.
 - Untuk deployment lintas-site yang tidak dapat membaca cookie CSRF API, set `VITE_CSRF_ENDPOINT` ke endpoint yang mengembalikan token CSRF di `{ "data": { "csrfToken": "..." } }`; token hanya ditahan di memori selama halaman terbuka.
 - API mengembalikan error konsisten `{ "error": { "code", "message", "fields" } }`. Klien memetakannya ke `ApiError`; kegagalan jaringan menampilkan pesan umum bahasa Indonesia.
-- Endpoint yang dipakai form: `POST /auth/register`, `POST /auth/login`, dan `POST /reports` (multipart). Halaman laporan, statistik, dan layar admin memakai data demonstrasi dari `src/shared/report-store.ts`; hasil moderasi admin (status, catatan tindak lanjut, linimasa) langsung tercermin di halaman publik dan pelapor.
+- Seluruh halaman memakai endpoint backend: auth (`/auth/*`), kategori publik & admin, laporan publik/pelapor/admin, tindak lanjut dan perubahan status admin, statistik, notifikasi, serta ekspor CSV. Detail kontrak ada di `src/shared/api/endpoints.ts` dan `src/shared/api/types.ts`.
 
 ## Rute utama
 

@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Files, LayoutDashboard, LogOut, MessageSquareText, Tags } from 'lucide-react'
+import { useSession } from '../../shared/session'
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -20,6 +21,14 @@ export function useAdminTitle(title: string) {
 }
 
 export function AdminShell({ crumb, children }: { crumb: string; children: ReactNode }) {
+  const { user, logout } = useSession()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout()
+    navigate('/masuk')
+  }
+
   return (
     <div className="adm">
       <a className="adm-skip" href="#adm-main">
@@ -33,7 +42,7 @@ export function AdminShell({ crumb, children }: { crumb: string; children: React
           </span>
           <span className="adm-brand-name">LaporinAja</span>
         </Link>
-        <span className="adm-account">Administrator platform</span>
+        <span className="adm-account">{user?.name ?? 'Administrator platform'}</span>
       </header>
 
       <div className="adm-workspace">
@@ -46,10 +55,10 @@ export function AdminShell({ crumb, children }: { crumb: string; children: React
                 <span>{label}</span>
               </NavLink>
             ))}
-            <Link className="adm-nav-link" to="/masuk">
+            <button type="button" className="adm-nav-link" onClick={handleLogout}>
               <LogOut size={20} aria-hidden="true" />
               <span>Logout</span>
-            </Link>
+            </button>
           </nav>
           <Link className="adm-public-link" to="/">
             Kembali ke situs publik ↗
@@ -63,14 +72,14 @@ export function AdminShell({ crumb, children }: { crumb: string; children: React
                 {label}
               </NavLink>
             ))}
-            <Link className="adm-quicknav-link" to="/masuk">
+            <button type="button" className="adm-quicknav-link" onClick={handleLogout}>
               Logout
-            </Link>
+            </button>
           </nav>
 
           <div className="adm-context">
             <span>Admin / {crumb}</span>
-            <span>Data demonstrasi</span>
+            <span>Data platform</span>
           </div>
 
           {children}

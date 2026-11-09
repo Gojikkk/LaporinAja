@@ -4,9 +4,23 @@ export type Status = 'SUBMITTED' | 'VERIFIED' | 'IN_PROGRESS' | 'RESOLVED' | 'RE
 
 /**
  * Bentuk ringkas laporan untuk kartu dan linimasa halaman warga.
- * Data aslinya ada di `shared/report-store.ts`; `toCard()` memetakannya ke sini.
+ * Data aslinya berasal dari API; `toCard()` memetakannya ke sini.
  */
-export type Report = { code: string; title: string; category: string; district: string; village: string; status: Status; date: string; description: string; tone: string; primaryReportCode?: string }
+export type Report = {
+  code: string
+  title: string
+  category: string
+  categorySlug?: string
+  district: string
+  village: string
+  status: Status
+  date: string
+  description: string
+  tone: string
+  primaryReportCode?: string
+  thumbnailUrl?: string | null
+  photoUrls?: string[]
+}
 
 export const statusInfo: Record<Status, { text: string; icon: typeof Clock3; cls: string }> = {
   SUBMITTED:{ text:'Menunggu verifikasi', icon:Clock3, cls:'submitted' }, VERIFIED:{ text:'Terverifikasi', icon:CheckCircle2, cls:'verified' }, IN_PROGRESS:{ text:'Dalam tindak lanjut', icon:SlidersHorizontal, cls:'progress' }, RESOLVED:{ text:'Selesai dicatat', icon:Check, cls:'resolved' }, REJECTED:{ text:'Ditolak', icon:CircleAlert, cls:'rejected' }, DUPLICATE:{ text:'Laporan serupa', icon:FileCheck2, cls:'duplicate' },
@@ -14,6 +28,7 @@ export const statusInfo: Record<Status, { text: string; icon: typeof Clock3; cls
 
 export type ReportCategory = { id: string; name: string; slug: string; icon: string; active: boolean }
 
+/** Fallback ketika API kategori belum termuat. */
 export const initialCategories: ReportCategory[] = [
   { id:'cat-jalan-rusak', name:'Jalan rusak', slug:'jalan-rusak', icon:'route', active:true },
   { id:'cat-lampu-jalan', name:'Lampu jalan', slug:'lampu-jalan', icon:'lamp', active:true },
@@ -24,3 +39,23 @@ export const initialCategories: ReportCategory[] = [
 ]
 
 export const categoryNames = initialCategories.map(c => c.name)
+
+/** Ikon tidak disimpan oleh API, jadi dipetakan dari slug kategori. */
+const iconBySlug: Record<string, string> = {
+  'jalan-rusak': 'route',
+  'lampu-jalan': 'lamp',
+  sampah: 'trash',
+  'saluran-air': 'droplets',
+  'fasilitas-umum': 'building',
+  lainnya: 'shapes',
+}
+
+const slugByName: Record<string, string> = Object.fromEntries(initialCategories.map((item) => [item.name, item.slug]))
+
+export function categoryIconName(slugOrName: string) {
+  return iconBySlug[slugOrName] ?? iconBySlug[slugByName[slugOrName] ?? ''] ?? 'shapes'
+}
+
+export function categorySlugOfName(name: string) {
+  return slugByName[name] ?? name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+}

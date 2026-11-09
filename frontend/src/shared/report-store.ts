@@ -1,5 +1,10 @@
-import { useSyncExternalStore } from 'react'
 import type { Report, Status } from './report-data'
+import type {
+  AdminReportDetailDto,
+  OwnerReportDetailDto,
+  PublicReportDetailDto,
+  PublicReportListItemDto,
+} from './api/types'
 
 /** Satu entri linimasa. Riwayat bersifat append-only, sama seperti aturan API. */
 export type AdminHistoryEntry = {
@@ -13,6 +18,8 @@ export type AdminReport = {
   code: string
   title: string
   category: string
+  categoryId: number
+  categorySlug: string
   city: string
   district: string
   village: string
@@ -23,9 +30,12 @@ export type AdminReport = {
   reporter: string
   description: string
   photos: number
+  photoUrls: string[]
+  thumbnailUrl: string | null
   history: AdminHistoryEntry[]
   /** Kode laporan utama bila laporan ini ditandai sebagai duplikat. */
   primaryReportCode?: string
+  isHidden: boolean
 }
 
 export const adminStatus: Record<Status, { label: string; tone: string }> = {
@@ -50,648 +60,57 @@ export const statusRank: Record<Status, number> = {
   DUPLICATE: 5,
 }
 
-export const adminCategories = [
-  'Jalan rusak',
-  'Lampu jalan',
-  'Sampah',
-  'Saluran air',
-  'Fasilitas umum',
-  'Lainnya',
-]
-
 /**
  * Status yang boleh dilihat publik. Dipakai untuk catatan ringkasan, sama
  * dengan filter `publicStatuses` pada layanan statistik.
  */
 export const publicStatuses: Status[] = ['VERIFIED', 'IN_PROGRESS', 'RESOLVED', 'DUPLICATE']
 
-const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+const dateTimeFormatter = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
   timeZone: 'Asia/Jakarta',
 })
 
 export function formatSubmitted(iso: string) {
-  return dateFormatter.format(new Date(`${iso}T00:00:00+07:00`))
+  const hasTime = iso.includes('T')
+  const date = new Date(hasTime ? iso : `${iso}T00:00:00+07:00`)
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  }).format(date)
 }
 
-const seededReports: AdminReport[] = [
-  {
-    code: 'LPR-2026-000045',
-    title: 'Penutup saluran retak di Jl. Cendana',
-    category: 'Saluran air',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Depan nomor 14',
-    status: 'SUBMITTED',
-    submittedAt: '2026-10-29',
-    reporter: 'Rani',
-    description:
-      'Penutup saluran di depan nomor 14 retak dan salah satu sisinya turun. Lubang selebar telapak tangan bisa membuat kaki pengguna trotoar terperosok.',
-    photos: 2,
-    history: [
-      { at: '29 Okt 2026 · 08.20 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-    ],
-  },
-  {
-    code: 'LPR-2026-000044',
-    title: 'Sampah menumpuk di dekat halte',
-    category: 'Sampah',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Halte di seberang kampus',
-    status: 'SUBMITTED',
-    submittedAt: '2026-10-28',
-    reporter: 'Bagas',
-    description:
-      'Tumpukan sampah rumah tangga memenuhi sisi halte sejak tiga hari terakhir. Aroma menyengat dan sebagian sampah terbawa ke jalan.',
-    photos: 3,
-    history: [
-      { at: '28 Okt 2026 · 17.45 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Tiga foto kondisi awal diterima.' },
-    ],
-  },
-  {
-    code: 'LPR-2026-000043',
-    title: 'Lampu taman padam di jalur pejalan kaki',
-    category: 'Lampu jalan',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Jalur pejalan kaki sisi utara',
-    status: 'SUBMITTED',
-    submittedAt: '2026-10-28',
-    reporter: 'Sari',
-    description:
-      'Dua dari empat lampu taman di jalur pejalan kaki padam. Jalur menjadi gelap setelah pukul 18.00 dan sering dipakai warga untuk berjalan pulang.',
-    photos: 2,
-    history: [
-      { at: '28 Okt 2026 · 16.10 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-    ],
-  },
-  {
-    code: 'LPR-2026-000042',
-    title: 'Lubang besar di Jl. Melati dekat gerbang kampus',
-    category: 'Jalan rusak',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Depan toko fotokopi',
-    status: 'SUBMITTED',
-    submittedAt: '2026-10-28',
-    reporter: 'Rani',
-    description:
-      'Terdapat lubang besar pada badan jalan dekat gerbang kampus, tepat di depan toko fotokopi. Permukaan aspal terkelupas dan menampung air setelah hujan, sehingga pengendara roda dua sering menghindar ke lajur berlawanan.',
-    photos: 2,
-    history: [
-      {
-        at: '28 Okt 2026 · 09.12 WIB',
-        title: 'Laporan dikirim',
-        transition: '— → Menunggu verifikasi',
-        note: 'Dua foto kondisi awal diterima. Belum tampil di publik.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000041',
-    title: 'Drainase buntu di Jl. Sukajadi',
-    category: 'Saluran air',
-    city: 'Bandung',
-    district: 'Sukajadi',
-    village: 'Pasteur',
-    landmark: 'Seberang minimarket',
-    status: 'VERIFIED',
-    submittedAt: '2026-10-27',
-    reporter: 'Dedi',
-    description:
-      'Air hujan tidak mengalir karena saluran tertutup endapan. Genangan setinggi mata kaki bertahan lebih dari dua jam setelah hujan berhenti.',
-    photos: 2,
-    history: [
-      { at: '27 Okt 2026 · 10.05 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '27 Okt 2026 · 14.30 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai. Laporan dapat dilihat publik.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000040',
-    title: 'Tiang lampu miring di Jl. Cihampelas',
-    category: 'Lampu jalan',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Cipaganti',
-    landmark: 'Dekat jembatan penyeberangan',
-    status: 'VERIFIED',
-    submittedAt: '2026-10-27',
-    reporter: 'Nia',
-    description:
-      'Tiang lampu berdiri miring sekitar 15 derajat dan pondasinya terlihat retak. Kabel di bagian atas ikut tertarik.',
-    photos: 3,
-    history: [
-      { at: '27 Okt 2026 · 08.40 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Tiga foto kondisi awal diterima.' },
-      {
-        at: '27 Okt 2026 · 11.12 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Kondisi tiang sesuai laporan. Menunggu penjadwalan tindak lanjut.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000039',
-    title: 'Trotoar amblas di depan pasar',
-    category: 'Fasilitas umum',
-    city: 'Bandung',
-    district: 'Cicendo',
-    village: 'Arjuna',
-    landmark: 'Pintu masuk pasar sisi timur',
-    status: 'REJECTED',
-    submittedAt: '2026-10-27',
-    reporter: 'Yusuf',
-    description:
-      'Sebagian trotoar amblas dan menyisakan lubang dangkal. Pengunjung pasar sering melangkah ke badan jalan untuk menghindarinya.',
-    photos: 2,
-    history: [
-      { at: '27 Okt 2026 · 07.25 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '27 Okt 2026 · 10.40 WIB',
-        title: 'Laporan ditolak',
-        transition: 'Menunggu verifikasi → Ditolak',
-        note: 'Lokasi pada foto tidak cocok dengan patokan yang ditulis. Pelapor dapat mengirim ulang dengan foto yang lebih jelas.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000038',
-    title: 'Jalan berlubang dekat persimpangan',
-    category: 'Jalan rusak',
-    city: 'Bandung',
-    district: 'Sukajadi',
-    village: 'Pasteur',
-    landmark: 'Simpang tiga Pasteur',
-    status: 'IN_PROGRESS',
-    submittedAt: '2026-10-26',
-    reporter: 'Ayu',
-    description:
-      'Ada lubang cukup besar di sisi jalan dekat persimpangan. Pengendara perlu berhati-hati, terutama saat malam karena tidak ada penanda.',
-    photos: 2,
-    history: [
-      { at: '26 Okt 2026 · 15.40 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '26 Okt 2026 · 16.18 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '27 Okt 2026 · 09.30 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pemeriksaan kondisi jalan dijadwalkan pada minggu ini.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000037',
-    title: 'Bangku taman perlu diperbaiki',
-    category: 'Fasilitas umum',
-    city: 'Bandung',
-    district: 'Bandung Wetan',
-    village: 'Citarum',
-    landmark: 'Taman sisi utara',
-    status: 'DUPLICATE',
-    submittedAt: '2026-10-26',
-    primaryReportCode: 'LPR-2026-000021',
-    reporter: 'Bagas',
-    description:
-      'Salah satu bangku taman terlihat rusak pada bagian sandaran. Ada laporan serupa yang telah dicatat sebelumnya.',
-    photos: 1,
-    history: [
-      { at: '26 Okt 2026 · 13.02 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Satu foto kondisi awal diterima.' },
-      {
-        at: '26 Okt 2026 · 13.48 WIB',
-        title: 'Ditandai sebagai duplikat',
-        transition: '— → Duplikat',
-        note: 'Merujuk pada laporan utama LPR-2026-000021 dengan lokasi dan objek yang sama.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000036',
-    title: 'Lampu penerangan gang padam',
-    category: 'Lampu jalan',
-    city: 'Bandung',
-    district: 'Cibeunying Kaler',
-    village: 'Cigadung',
-    landmark: 'Gang depan musala',
-    status: 'RESOLVED',
-    submittedAt: '2026-10-25',
-    reporter: 'Sari',
-    description:
-      'Lampu penerangan di mulut gang padam sejak sepekan. Gang menjadi gelap dan sulit dilewati setelah magrib.',
-    photos: 1,
-    history: [
-      { at: '25 Okt 2026 · 19.10 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Satu foto kondisi awal diterima.' },
-      {
-        at: '25 Okt 2026 · 20.02 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '26 Okt 2026 · 08.15 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pemeriksaan jaringan lampu dilakukan.',
-      },
-      {
-        at: '27 Okt 2026 · 15.40 WIB',
-        title: 'Tindak lanjut selesai dicatat',
-        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
-        note: 'Lampu diganti dan sudah menyala. Bukti penyelesaian dilampirkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000035',
-    title: 'Sampah menumpuk di tepi saluran',
-    category: 'Sampah',
-    city: 'Bandung',
-    district: 'Lengkong',
-    village: 'Burangrang',
-    landmark: 'Tepi saluran Jl. Burangrang',
-    status: 'IN_PROGRESS',
-    submittedAt: '2026-10-25',
-    reporter: 'Dedi',
-    description:
-      'Sampah menumpuk di tepi saluran dan mulai menghambat aliran air. Sebagian sampah sudah masuk ke dalam saluran.',
-    photos: 2,
-    history: [
-      { at: '25 Okt 2026 · 11.20 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '25 Okt 2026 · 13.05 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '26 Okt 2026 · 09.00 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pengangkutan sampah dijadwalkan bersama petugas kebersihan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000034',
-    title: 'Saluran air tersumbat setelah hujan',
-    category: 'Saluran air',
-    city: 'Bandung',
-    district: 'Cicendo',
-    village: 'Arjuna',
-    landmark: 'Depan sekolah dasar',
-    status: 'IN_PROGRESS',
-    submittedAt: '2026-10-24',
-    reporter: 'Yusuf',
-    description:
-      'Aliran air tersumbat daun dan sampah setelah hujan deras. Air sempat naik ke halaman rumah warga di sisi jalan.',
-    photos: 2,
-    history: [
-      { at: '24 Okt 2026 · 18.35 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '25 Okt 2026 · 09.12 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '26 Okt 2026 · 10.40 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pembersihan saluran dijadwalkan pada akhir pekan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000033',
-    title: 'Lampu jalan padam di Jl. Siliwangi',
-    category: 'Lampu jalan',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Depan gedung serbaguna',
-    status: 'VERIFIED',
-    submittedAt: '2026-10-26',
-    reporter: 'Ayu',
-    description:
-      'Tiga lampu jalan padam berurutan sehingga ruas jalan gelap sepanjang kurang lebih 100 meter.',
-    photos: 2,
-    history: [
-      { at: '26 Okt 2026 · 20.15 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '27 Okt 2026 · 08.05 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Titik lampu sudah dicatat untuk pemeriksaan jaringan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000032',
-    title: 'Aspal mengelupas di Jl. Melati dekat gerbang kampus',
-    category: 'Jalan rusak',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Depan gerbang kampus',
-    status: 'VERIFIED',
-    submittedAt: '2026-10-26',
-    reporter: 'Nia',
-    description:
-      'Lapisan aspal mengelupas di badan jalan dan membentuk pecahan tajam. Pengendara sepeda melaporkan ban tergores di lokasi ini.',
-    photos: 2,
-    history: [
-      { at: '26 Okt 2026 · 07.50 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '26 Okt 2026 · 11.30 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai. Laporan dapat dilihat publik.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000031',
-    title: 'Kerusakan bangku fasilitas umum',
-    category: 'Fasilitas umum',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Dago',
-    landmark: 'Area taman umum',
-    status: 'REJECTED',
-    submittedAt: '2026-10-26',
-    reporter: 'Rani',
-    description:
-      'Bangku pada fasilitas umum terlihat rusak. Foto yang dilampirkan belum cukup jelas menunjukkan kondisi objek yang dilaporkan.',
-    photos: 2,
-    history: [
-      { at: '26 Okt 2026 · 09.12 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '26 Okt 2026 · 10.30 WIB',
-        title: 'Laporan ditolak',
-        transition: 'Menunggu verifikasi → Ditolak',
-        note: 'Foto belum menunjukkan kerusakan fasilitas publik yang dilaporkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000030',
-    title: 'Lampu hias taman mati sejak sepekan',
-    category: 'Lampu jalan',
-    city: 'Bandung',
-    district: 'Cibeunying Kidul',
-    village: 'Cikutra',
-    landmark: 'Taman sisi timur',
-    status: 'IN_PROGRESS',
-    submittedAt: '2026-10-23',
-    reporter: 'Bagas',
-    description:
-      'Empat lampu hias di taman sisi timur tidak menyala sejak sepekan terakhir. Bagian tengah taman menjadi gelap dan bangku di sekitarnya tidak lagi dipakai warga.',
-    photos: 2,
-    history: [
-      { at: '23 Okt 2026 · 18.20 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '24 Okt 2026 · 08.10 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Titik lampu sesuai dengan laporan.',
-      },
-      {
-        at: '25 Okt 2026 · 09.05 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pemeriksaan jalur listrik taman dijadwalkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000029',
-    title: 'Genangan di depan pertokoan',
-    category: 'Saluran air',
-    city: 'Bandung',
-    district: 'Lengkong',
-    village: 'Burangrang',
-    landmark: 'Depan deretan pertokoan',
-    status: 'RESOLVED',
-    submittedAt: '2026-10-23',
-    reporter: 'Ayu',
-    description:
-      'Saluran di depan pertokoan tersumbat sehingga air hujan menggenang setinggi mata kaki dan masuk ke teras toko.',
-    photos: 2,
-    history: [
-      { at: '23 Okt 2026 · 11.15 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '23 Okt 2026 · 15.40 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '24 Okt 2026 · 08.30 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pembersihan saluran dijadwalkan pagi ini.',
-      },
-      {
-        at: '24 Okt 2026 · 14.20 WIB',
-        title: 'Tindak lanjut selesai dicatat',
-        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
-        note: 'Saluran dibersihkan dan air kembali mengalir. Bukti penyelesaian dilampirkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000028',
-    title: 'Sampah pasar menumpuk di bahu jalan',
-    category: 'Sampah',
-    city: 'Bandung',
-    district: 'Cicendo',
-    village: 'Arjuna',
-    landmark: 'Bahu jalan sisi pasar',
-    status: 'RESOLVED',
-    submittedAt: '2026-10-22',
-    reporter: 'Sari',
-    description:
-      'Sampah pasar menumpuk di bahu jalan dan menutup sebagian jalur pejalan kaki. Tumpukan mulai berbau pada siang hari.',
-    photos: 3,
-    history: [
-      { at: '22 Okt 2026 · 13.05 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Tiga foto kondisi awal diterima.' },
-      {
-        at: '22 Okt 2026 · 16.12 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '23 Okt 2026 · 07.45 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Pengangkutan sampah dijadwalkan bersama petugas pasar.',
-      },
-      {
-        at: '23 Okt 2026 · 11.30 WIB',
-        title: 'Tindak lanjut selesai dicatat',
-        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
-        note: 'Sampah diangkut dan bahu jalan dibersihkan. Bukti penyelesaian dilampirkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000027',
-    title: 'Pagar taman miring ke jalur pejalan kaki',
-    category: 'Fasilitas umum',
-    city: 'Bandung',
-    district: 'Bandung Wetan',
-    village: 'Citarum',
-    landmark: 'Pagar sisi selatan taman',
-    status: 'RESOLVED',
-    submittedAt: '2026-10-22',
-    reporter: 'Nia',
-    description:
-      'Pagar taman miring ke arah jalur pejalan kaki setelah tertabrak. Ujung pagar berada setinggi pinggang dan membahayakan pengguna jalur.',
-    photos: 2,
-    history: [
-      { at: '22 Okt 2026 · 08.15 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '22 Okt 2026 · 10.50 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Kondisi pagar sesuai laporan.',
-      },
-      {
-        at: '23 Okt 2026 · 09.10 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Perbaikan pagar dijadwalkan.',
-      },
-      {
-        at: '24 Okt 2026 · 15.05 WIB',
-        title: 'Tindak lanjut selesai dicatat',
-        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
-        note: 'Pagar dikembalikan ke posisi tegak dan pondasinya diperkuat. Bukti penyelesaian dilampirkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000026',
-    title: 'Jalan retak memanjang di Jl. Cihampelas',
-    category: 'Jalan rusak',
-    city: 'Bandung',
-    district: 'Coblong',
-    village: 'Cipaganti',
-    landmark: 'Depan pertokoan Cihampelas',
-    status: 'RESOLVED',
-    submittedAt: '2026-10-21',
-    reporter: 'Dedi',
-    description:
-      'Retakan memanjang sepanjang kurang lebih lima meter di badan jalan. Bagian tepi retakan mulai terangkat dan lepas.',
-    photos: 2,
-    history: [
-      { at: '21 Okt 2026 · 16.40 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '22 Okt 2026 · 08.05 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '22 Okt 2026 · 13.30 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Perbaikan permukaan jalan dijadwalkan.',
-      },
-      {
-        at: '24 Okt 2026 · 10.15 WIB',
-        title: 'Tindak lanjut selesai dicatat',
-        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
-        note: 'Retakan ditambal dan permukaan diratakan. Bukti penyelesaian dilampirkan.',
-      },
-    ],
-  },
-  {
-    code: 'LPR-2026-000021',
-    title: 'Bangku taman rusak di Taman Citarum',
-    category: 'Fasilitas umum',
-    city: 'Bandung',
-    district: 'Bandung Wetan',
-    village: 'Citarum',
-    landmark: 'Taman sisi utara',
-    status: 'RESOLVED',
-    submittedAt: '2026-10-22',
-    reporter: 'Nadia',
-    description:
-      'Sandaran salah satu bangku taman patah sehingga tidak aman dipakai. Bagian kayu juga sudah lapuk di sisi kanan.',
-    photos: 2,
-    history: [
-      { at: '22 Okt 2026 · 09.12 WIB', title: 'Laporan dikirim', transition: '— → Menunggu verifikasi', note: 'Dua foto kondisi awal diterima.' },
-      {
-        at: '22 Okt 2026 · 10.05 WIB',
-        title: 'Laporan diverifikasi',
-        transition: 'Menunggu verifikasi → Terverifikasi',
-        note: 'Lokasi dan kategori sesuai.',
-      },
-      {
-        at: '23 Okt 2026 · 08.40 WIB',
-        title: 'Tindak lanjut dimulai',
-        transition: 'Terverifikasi → Sedang ditindaklanjuti',
-        note: 'Perbaikan bangku dijadwalkan pada akhir pekan.',
-      },
-      {
-        at: '25 Okt 2026 · 14.20 WIB',
-        title: 'Tindak lanjut selesai dicatat',
-        transition: 'Sedang ditindaklanjuti → Tindak lanjut selesai',
-        note: 'Sandaran bangku diganti dan permukaan kayu dirapikan. Bukti penyelesaian dilampirkan.',
-      },
-    ],
-  },
-]
-
-/* ------------------------------------------------------------------------- */
-/* Penyimpanan demo                                                          */
-/* Satu sumber data untuk dashboard, antrean, dan halaman tinjau supaya      */
-/* perubahan status langsung terlihat di seluruh ruang kerja.                */
-/* Ketika API siap, ganti isi `transitionReport` dengan pemanggilan api().    */
-/* ------------------------------------------------------------------------- */
-
-const listeners = new Set<() => void>()
-let reports: AdminReport[] = seededReports
-
-function emit() {
-  listeners.forEach((listener) => listener())
+export function formatDateTime(iso: string) {
+  return `${dateTimeFormatter.format(new Date(iso))} WIB`
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
+const categoryTone: Record<string, string> = {
+  'Jalan rusak': 'blue',
+  'Lampu jalan': 'amber',
+  Sampah: 'green',
+  'Saluran air': 'teal',
+  'Fasilitas umum': 'purple',
+  Lainnya: 'amber',
 }
 
-function getSnapshot() {
-  return reports
+const toneBySlug: Record<string, string> = {
+  'jalan-rusak': 'blue',
+  'lampu-jalan': 'amber',
+  sampah: 'green',
+  'saluran-air': 'teal',
+  'fasilitas-umum': 'purple',
+  lainnya: 'amber',
 }
 
-export function useReports() {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+export function toneOf(report: { category: string; categorySlug: string }) {
+  return categoryTone[report.category] ?? toneBySlug[report.categorySlug] ?? 'amber'
 }
-
-/** Nama lama agar layar admin tidak perlu diubah. */
-export const useAdminReports = useReports
 
 /** Urutan antrean: belum diverifikasi lebih dulu, lalu tanggal terbaru. */
 export function prioritize(rows: AdminReport[]) {
@@ -700,98 +119,72 @@ export function prioritize(rows: AdminReport[]) {
   )
 }
 
-function jakartaNow() {
-  const parts = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Jakarta',
-  }).formatToParts(new Date())
-  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${value('day')} ${value('month')} ${value('year')} · ${value('hour')}.${value('minute')} WIB`
-}
-
-export function transitionReport(
-  code: string,
-  to: Status,
-  entry: { title: string; note: string; transition?: string },
-) {
-  reports = reports.map((report) => {
-    if (report.code !== code) return report
-    return {
-      ...report,
-      status: to,
-      primaryReportCode: to === 'DUPLICATE' ? report.primaryReportCode : undefined,
-      history: [
-        ...report.history,
-        {
-          at: jakartaNow(),
-          title: entry.title,
-          transition: entry.transition,
-          note: entry.note,
-        },
-      ],
-    }
-  })
-  emit()
-}
-
-/**
- * Tandai laporan sebagai duplikat dan hubungkan ke laporan utama.
- * Laporan utama wajib sudah tampil di publik dan bukan duplikat. Bila laporan
- * yang ditandai sebelumnya menjadi acuan laporan lain, rujukan itu dialihkan
- * ke laporan utama yang baru agar rantai referensi tetap satu tingkat.
- */
-export function markDuplicate(code: string, primaryCode: string, note?: string) {
-  const source = reports.find((report) => report.code === code)
-  const primary = reports.find((report) => report.code === primaryCode)
-  if (
-    !source ||
-    code === primaryCode ||
-    !primary ||
-    !isPublicReport(primary) ||
-    primary.status === 'DUPLICATE' ||
-    !['SUBMITTED', 'VERIFIED', 'IN_PROGRESS'].includes(source.status)
-  ) {
-    return false
+export function countByStatus(rows: AdminReport[]) {
+  const counts: Record<Status, number> = {
+    SUBMITTED: 0,
+    VERIFIED: 0,
+    IN_PROGRESS: 0,
+    RESOLVED: 0,
+    REJECTED: 0,
+    DUPLICATE: 0,
   }
-  const extra = note?.trim()
-  reports = reports.map((report) => {
-    // Rujukan yang sebelumnya menunjuk ke laporan ini dialihkan ke acuan baru.
-    if (report.primaryReportCode === code) {
-      return {
-        ...report,
-        primaryReportCode: primaryCode,
-        history: [
-          ...report.history,
-          {
-            at: jakartaNow(),
-            title: 'Rujukan duplikat dialihkan',
-            note: `Laporan utama ${code} ditandai duplikat, sehingga rujukan dialihkan ke laporan utama ${primaryCode}.`,
-          },
-        ],
-      }
-    }
-    if (report.code !== code) return report
-    return {
-      ...report,
-      status: 'DUPLICATE',
-      primaryReportCode: primaryCode,
-      history: [
-        ...report.history,
-        {
-          at: jakartaNow(),
-          title: 'Ditandai sebagai duplikat',
-          transition: `${adminStatus[report.status].label} → Duplikat`,
-          note: `${extra ? `${extra} ` : ''}Merujuk pada laporan utama ${primaryCode}.`,
-        },
-      ],
-    }
+  for (const row of rows) counts[row.status] += 1
+  return counts
+}
+
+/** Status yang boleh tampil di halaman publik. */
+export function isPublicReport(report: AdminReport) {
+  return publicStatuses.includes(report.status)
+}
+
+/** Laporan yang sudah ditinjau, diurutkan seperti antrean admin. */
+export function publicReports(rows: AdminReport[]) {
+  return prioritize(rows.filter(isPublicReport))
+}
+
+export function reportPageCount(total: number, limit: number) {
+  return Math.max(1, Math.ceil(total / Math.max(1, limit)))
+}
+
+export function clampReportPage(page: number, pageCount: number) {
+  return Math.min(Math.max(1, Number.isFinite(page) ? Math.trunc(page) : 1), pageCount)
+}
+
+/** Nomor halaman yang ditampilkan oleh pagination, dengan penanda celah. */
+export function reportPageWindow(currentPage: number, pageCount: number): Array<number | 'gap'> {
+  if (pageCount <= 7) return Array.from({ length: pageCount }, (_, index) => index + 1)
+  const pages = new Set<number>([1, pageCount, currentPage - 1, currentPage, currentPage + 1])
+  const visible = [...pages].filter((page) => page >= 1 && page <= pageCount).sort((a, b) => a - b)
+  const result: Array<number | 'gap'> = []
+  visible.forEach((page, index) => {
+    if (index > 0 && page - visible[index - 1] > 1) result.push('gap')
+    result.push(page)
   })
-  emit()
-  return true
+  return result
+}
+
+/** Bentuk ringkas yang dipakai kartu laporan dan linimasa publik. */
+export function toCard(report: AdminReport): Report {
+  return {
+    code: report.code,
+    title: report.title,
+    category: report.category,
+    categorySlug: report.categorySlug,
+    district: report.district,
+    village: report.village,
+    status: report.status,
+    date: formatSubmitted(report.submittedAt),
+    description: report.description,
+    primaryReportCode: report.primaryReportCode,
+    thumbnailUrl: report.thumbnailUrl,
+    photoUrls: report.photoUrls,
+    tone: toneOf(report),
+  }
+}
+
+/** Catatan terbaru dari administrator, dipakai kartu tindak lanjut. */
+export function latestNote(report: AdminReport) {
+  return report.history[report.history.length - 1]
 }
 
 /** Kandidat laporan utama: sudah publik, bukan duplikat, dan bukan dirinya sendiri. */
@@ -821,143 +214,101 @@ export function publicPrimaryReportOf(rows: AdminReport[], report: AdminReport) 
   return primary && isPublicReport(primary) && primary.status !== 'DUPLICATE' ? primary : undefined
 }
 
-export function countByStatus(rows: AdminReport[]) {
-  const counts: Record<Status, number> = {
-    SUBMITTED: 0,
-    VERIFIED: 0,
-    IN_PROGRESS: 0,
-    RESOLVED: 0,
-    REJECTED: 0,
-    DUPLICATE: 0,
+/* ------------------------------------------------------------------ mapper */
+
+function timelineEntry(
+  at: string,
+  title: string,
+  note: string,
+  transition?: string,
+): AdminHistoryEntry {
+  return { at: formatDateTime(at), title, note, transition }
+}
+
+function mapHistory(detail: PublicReportDetailDto) {
+  const entries: Array<{ createdAt: string; entry: AdminHistoryEntry }> = []
+  for (const item of detail.timeline ?? []) {
+    entries.push({
+      createdAt: item.createdAt,
+      entry: timelineEntry(
+        item.createdAt,
+        adminStatus[item.toStatus].label,
+        item.reason?.trim() || `${item.actorLabel} mencatat perubahan status.`,
+        `${item.fromStatus ? adminStatus[item.fromStatus].label : '—'} → ${adminStatus[item.toStatus].label}`,
+      ),
+    })
   }
-  for (const row of rows) counts[row.status] += 1
-  return counts
+  for (const item of detail.followUps ?? []) {
+    const explanation = item.resolutionExplanation?.trim()
+    entries.push({
+      createdAt: item.createdAt,
+      entry: timelineEntry(
+        item.createdAt,
+        item.isResolutionNote ? 'Catatan penyelesaian' : 'Catatan tindak lanjut',
+        explanation ? `${item.note} ${explanation}` : item.note,
+      ),
+    })
+  }
+  if (!entries.length) {
+    entries.push({
+      createdAt: detail.createdAt,
+      entry: timelineEntry(detail.createdAt, 'Laporan dikirim', 'Laporan diterima oleh sistem.'),
+    })
+  }
+  return entries
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((item) => item.entry)
 }
 
-/* ------------------------------------------------------------------------- */
-/* Tampilan publik dan pelapor                                               */
-/* Memakai sumber yang sama dengan ruang kerja admin supaya hasil moderasi    */
-/* langsung terlihat di halaman warga.                                       */
-/* ------------------------------------------------------------------------- */
-
-const categoryTone: Record<string, string> = {
-  'Jalan rusak': 'blue',
-  'Lampu jalan': 'amber',
-  Sampah: 'green',
-  'Saluran air': 'teal',
-  'Fasilitas umum': 'purple',
-  Lainnya: 'amber',
-}
-
-/** Status yang boleh tampil di halaman publik. */
-export function isPublicReport(report: AdminReport) {
-  return publicStatuses.includes(report.status)
-}
-
-/** Laporan yang sudah ditinjau, diurutkan seperti antrean admin. */
-export function publicReports(rows: AdminReport[]) {
-  return prioritize(rows.filter(isPublicReport))
-}
-
-/** Bentuk ringkas yang dipakai kartu laporan dan linimasa publik. */
-export function toCard(report: AdminReport): Report {
-  const tone = categoryTone[report.category] ?? 'amber'
+export function mapListReport(dto: PublicReportListItemDto): AdminReport {
   return {
-    code: report.code,
-    title: report.title,
-    category: report.category,
-    district: report.district,
-    village: report.village,
-    status: report.status,
-    date: formatSubmitted(report.submittedAt),
-    description: report.description,
-    primaryReportCode: report.primaryReportCode,
-    tone,
+    code: dto.code,
+    title: dto.title,
+    category: dto.category.name,
+    categoryId: dto.category.id,
+    categorySlug: dto.category.slug,
+    city: '',
+    district: dto.district,
+    village: dto.village,
+    landmark: '',
+    status: dto.status,
+    submittedAt: dto.createdAt,
+    reporter: '',
+    description: '',
+    photos: dto.thumbnailUrl ? 1 : 0,
+    photoUrls: dto.thumbnailUrl ? [dto.thumbnailUrl] : [],
+    thumbnailUrl: dto.thumbnailUrl,
+    history: [timelineEntry(dto.createdAt, 'Laporan dikirim', 'Laporan diterima oleh sistem.')],
+    isHidden: false,
   }
 }
 
-/** Catatan terbaru dari administrator, dipakai kartu tindak lanjut. */
-export function latestNote(report: AdminReport) {
-  return report.history[report.history.length - 1]
-}
-
-/* ------------------------------------------------------------------------- */
-/* Filter dan pagination daftar publik                                       */
-/* Helper murni supaya halaman /laporan tetap memakai demo store sekarang    */
-/* dan bisa diganti sumber API tanpa mengubah logika tampilan.               */
-/* ------------------------------------------------------------------------- */
-
-export const REPORT_PAGE_SIZE = 6
-
-export type ReportQuery = {
-  q?: string
-  /** Nama kategori, bukan slug. Pemanggil yang memetakan slug dari URL. */
-  category?: string
-  status?: Status
-}
-
-/** Menyaring laporan publik berdasarkan kata kunci, kategori, dan status. */
-export function filterPublicReports(rows: AdminReport[], query: ReportQuery) {
-  const keyword = query.q?.trim().toLocaleLowerCase('id-ID') ?? ''
-  return rows.filter((report) => {
-    if (query.category && report.category !== query.category) return false
-    if (query.status && report.status !== query.status) return false
-    if (!keyword) return true
-    return `${report.title} ${report.city} ${report.village} ${report.district} ${report.code}`
-      .toLocaleLowerCase('id-ID')
-      .includes(keyword)
-  })
-}
-
-export function reportPageCount(total: number, pageSize = REPORT_PAGE_SIZE) {
-  return total > 0 ? Math.ceil(total / pageSize) : 0
-}
-
-/** Halaman selalu berada di rentang 1..pageCount agar URL tidak menyesatkan. */
-export function clampReportPage(page: number, pageCount: number) {
-  const last = Math.max(1, pageCount)
-  const safe = Number.isFinite(page) ? Math.trunc(page) : 1
-  return Math.min(Math.max(1, safe), last)
-}
-
-/** Nomor halaman yang tampil, dengan 'gap' sebagai penanda elipsis. */
-export function reportPageWindow(page: number, pageCount: number, max = 5): (number | 'gap')[] {
-  if (pageCount <= max + 2) {
-    return Array.from({ length: pageCount }, (_, index) => index + 1)
-  }
-  const half = Math.floor(max / 2)
-  let start = Math.max(1, page - half)
-  let end = start + max - 1
-  if (end > pageCount) {
-    end = pageCount
-    start = end - max + 1
-  }
-  const pages: (number | 'gap')[] = []
-  if (start > 1) {
-    pages.push(1)
-    if (start > 2) pages.push('gap')
-  }
-  for (let current = start; current <= end; current += 1) pages.push(current)
-  if (end < pageCount) {
-    if (end < pageCount - 1) pages.push('gap')
-    pages.push(pageCount)
-  }
-  return pages
-}
-
-export function paginatePublicReports(rows: AdminReport[], page: number, pageSize = REPORT_PAGE_SIZE) {
-  const total = rows.length
-  const pageCount = reportPageCount(total, pageSize)
-  const safePage = clampReportPage(page, pageCount)
-  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const end = Math.min(safePage * pageSize, total)
+export function mapDetailReport(
+  dto: PublicReportDetailDto | OwnerReportDetailDto | AdminReportDetailDto,
+  options: { reporter?: string } = {},
+): AdminReport {
+  const detail = dto as PublicReportDetailDto
+  const admin = dto as Partial<AdminReportDetailDto>
+  const photos = (detail.photos ?? detail.evidences ?? []).map((item) => item.url)
   return {
-    items: total === 0 ? [] : rows.slice((safePage - 1) * pageSize, end),
-    page: safePage,
-    pageCount,
-    start,
-    end,
-    total,
+    code: detail.code,
+    title: detail.title,
+    category: detail.category.name,
+    categoryId: detail.category.id,
+    categorySlug: detail.category.slug,
+    city: detail.city,
+    district: detail.district,
+    village: detail.village,
+    landmark: detail.locationDetail,
+    status: detail.status,
+    submittedAt: detail.createdAt,
+    reporter: admin.reporterName ?? options.reporter ?? '',
+    description: detail.description,
+    photos: detail.photos?.length ?? 0,
+    photoUrls: photos,
+    thumbnailUrl: detail.thumbnailUrl,
+    history: mapHistory(detail),
+    primaryReportCode: detail.duplicateOf?.code,
+    isHidden: admin.isHidden ?? false,
   }
 }
-
