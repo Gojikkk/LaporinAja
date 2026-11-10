@@ -1,9 +1,10 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent, type InputEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileCheck2, FilePlus2, Info, LocateFixed, MapPin, MessageSquareText, Search, SlidersHorizontal } from 'lucide-react'
 import { AppShell, Button, CategoryIcon, PageIntro, PrimaryReportCard, StatCard, StatusBadge, Timeline, TextField } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
-import { createReport, getCategories, getMyReport, getMyReports, getPublicReport } from '../../shared/api/endpoints'
+import { createReport, getCategories, getMyReport, getMyReports, getPublicReport, searchReportLocations } from '../../shared/api/endpoints'
+import type { GeocodingCandidateDto } from '../../shared/api/types'
 import { useSession } from '../../shared/session'
 import { useAsync } from '../../shared/useAsync'
 import { countByStatus, latestNote, mapDetailReport, mapListReport, toCard } from '../../shared/report-store'
@@ -51,6 +52,7 @@ export function Dashboard() {
 
 export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
   const navigate = useNavigate()
+  const formRef = useRef<HTMLFormElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [latitude, setLatitude] = useState('')
@@ -58,9 +60,69 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
   const [locationBusy, setLocationBusy] = useState(false)
   const [locationMessage, setLocationMessage] = useState('')
   const [locationError, setLocationError] = useState('')
+  const [locationResults, setLocationResults] = useState<GeocodingCandidateDto[]>([])
+  const [selectedLocation, setSelectedLocation] = useState<GeocodingCandidateDto | null>(null)
   const [submissionKey] = useState(() => crypto.randomUUID())
   const loadCategories = useCallback(() => getCategories(), [])
   const { data: categories, error: categoryError, loading: categoryLoading } = useAsync(loadCategories, [])
+
+  async function searchLocationFromAddress() {
+    const form = formRef.current
+    const getField = (name: string) => {
+      const field = form?.elements.namedItem(name)
+      return field instanceof HTMLInputElement ? field.value.trim() : ''
+    }
+    const locationParts = [
+      getField('locationDetail'),
+      getField('village'),
+      getField('district'),
+      getField('city'),
+    ].filter(Boolean)
+    if (locationParts.length === 0) {
+      setLocationError('Isi patokan atau wilayah lokasi terlebih dahulu.')
+      return
+    }
+    const query = [...locationParts, 'Indonesia'].join(', ')
+
+    setLocationBusy(true)
+    setLocationError('')
+    setLocationMessage('')
+    setLocationResults([])
+    setSelectedLocation(null)
+    setLatitude('')
+    setLongitude('')
+    try {
+      const results = await searchReportLocations(query)
+      setLocationResults(results)
+      if (results.length === 0) setLocationMessage('Lokasi belum ditemukan. Coba ubah patokan atau pilih lokasi perangkat.')
+    } catch (reason) {
+      setLocationError(reason instanceof ApiError
+        ? reason.message
+        : 'Pencarian lokasi gagal. Coba lagi atau gunakan lokasi perangkat.')
+    } finally {
+      setLocationBusy(false)
+    }
+  }
+
+  function handleLocationInput(event: InputEvent<HTMLFormElement>) {
+    const target = event.target
+    if (!(target instanceof HTMLInputElement) || !['city', 'district', 'village', 'locationDetail'].includes(target.name)) return
+    setLocationResults([])
+    setSelectedLocation(null)
+    setLatitude('')
+    setLongitude('')
+    setLocationMessage('')
+    setLocationError('')
+  }
+
+  function selectLocation(location: GeocodingCandidateDto) {
+    setSelectedLocation(location)
+    setLatitude(String(location.latitude))
+    setLongitude(String(location.longitude))
+    setLocationResults([])
+    setLocationError('')
+    setLocationMessage('Titik lokasi dipilih. Pastikan hasilnya sesuai sebelum mengirim laporan.')
+  }
 
   function useDeviceLocation() {
     setLocationMessage('')
@@ -75,6 +137,8 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
       (position) => {
         setLatitude(String(position.coords.latitude))
         setLongitude(String(position.coords.longitude))
+        setSelectedLocation(null)
+        setLocationResults([])
         setLocationMessage('Lokasi berhasil diambil. Periksa kembali titiknya sebelum mengirim.')
         setLocationBusy(false)
       },
@@ -167,7 +231,7 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
 
   const options = categories ?? []
 
-  return <AppShell mode="reporter"><main className="page container narrow-page"><Link to="/dashboard" className="back-link"><ArrowLeft size={16}/> Kembali ke dashboard</Link><PageIntro title="Ceritakan temuanmu." description="Informasi yang jelas membantu laporan ditinjau dengan lebih mudah."/><div className="demo-banner"><Info size={18}/><span>Laporan barumu hanya dapat dilihat olehmu sampai ditinjau administrator platform.</span></div><form className="content-panel report-form" onSubmit={submit}>
+  return <AppShell mode="reporter"><main className="page container narrow-page"><Link to="/dashboard" className="back-link"><ArrowLeft size={16}/> Kembali ke dashboard</Link><PageIntro title="Ceritakan temuanmu." description="Informasi yang jelas membantu laporan ditinjau dengan lebih mudah."/><div className="demo-banner"><Info size={18}/><span>Laporan barumu hanya dapat dilihat olehmu sampai ditinjau administrator platform.</span></div><form ref={formRef} className="content-panel report-form" onSubmit={submit} onInput={handleLocationInput}>
     <div className="form-section-title"><span>01</span><div><h2>Jenis masalah</h2><p>Pilih kategori yang paling sesuai.</p></div></div>
     <div className="form-field"><label htmlFor="categoryId">Kategori *</label><select id="categoryId" name="categoryId" required defaultValue=""><option value="" disabled>{categoryLoading ? 'Memuat kategori…' : 'Pilih kategori laporan'}</option>{options.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>{categoryError ? <small>Kategori tidak dapat dimuat. Coba muat ulang halaman.</small> : null}</div>
     <div className="form-section-title"><span>02</span><div><h2>Detail laporan</h2><p>Jelaskan apa yang kamu temukan.</p></div></div>
@@ -177,17 +241,32 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     <div className="form-two"><TextField label="Kota/kabupaten" id="city" placeholder="Contoh: Bandung"/><TextField label="Kecamatan" id="district" placeholder="Nama kecamatan"/></div>
     <TextField label="Kelurahan/desa" id="village" placeholder="Nama kelurahan atau desa"/>
     <TextField label="Patokan lokasi" id="locationDetail" placeholder="Contoh: depan taman lingkungan" hint="Hindari alamat rumah pribadi."/>
-    <div className="form-section-title"><span>04</span><div><h2>Titik lokasi (opsional)</h2><p>Gunakan lokasi perangkat atau isi koordinat manual agar laporan dapat ditampilkan di peta.</p></div></div>
+    <div className="form-section-title"><span>04</span><div><h2>Titik lokasi (opsional)</h2><p>Cari titik dari patokan yang sudah diisi atau gunakan lokasi perangkat agar laporan dapat ditampilkan di peta.</p></div></div>
     <div className="report-coordinate-panel">
+      <button type="button" className="button outline report-location-button" onClick={searchLocationFromAddress} disabled={locationBusy || busy}>
+        <Search size={17} aria-hidden="true"/>{locationBusy ? 'Mencari lokasi…' : 'Cari titik dari lokasi'}
+      </button>
+      <p className="report-location-hint">Saat ditekan, patokan dan wilayah dikirim ke OpenStreetMap untuk dicari. Pilih hasil yang paling sesuai—titiknya bisa berupa perkiraan area. Jangan masukkan alamat rumah pribadi.</p>
+      {locationResults.length ? <div className="report-location-results" role="group" aria-label="Hasil pencarian lokasi">
+        <p className="report-location-results-label">Pilih titik lokasi yang sesuai:</p>
+        {locationResults.map((location, index) => <button type="button" className="report-location-result" key={`${location.latitude},${location.longitude}`} onClick={() => selectLocation(location)}>
+          <MapPin size={16} aria-hidden="true"/><span>{location.displayName}</span><small>Pilih</small>
+        </button>)}
+      </div> : null}
+      {selectedLocation ? <div className="report-selected-location"><MapPin size={15} aria-hidden="true"/><span>Titik terpilih: {selectedLocation.displayName}</span></div> : null}
       <button type="button" className="button outline report-location-button" onClick={useDeviceLocation} disabled={locationBusy || busy}>
         <LocateFixed size={17} aria-hidden="true"/>{locationBusy ? 'Mengambil lokasi…' : 'Gunakan lokasi saya'}
       </button>
-      <p className="report-location-hint">Browser akan meminta izin lokasi. Kamu juga bisa memasukkan koordinat dari peta secara manual. Titik publik ditampilkan dengan pembulatan 3 desimal.</p>
-      <div className="form-two report-coordinate-fields">
-        <div className="form-field"><label htmlFor="latitude">Latitude</label><input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="Contoh: -6.1752" aria-describedby="coordinate-range-hint"/></div>
-        <div className="form-field"><label htmlFor="longitude">Longitude</label><input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="Contoh: 106.8271" aria-describedby="coordinate-range-hint"/></div>
-      </div>
-      <small id="coordinate-range-hint" className="report-location-hint">Isi keduanya atau biarkan kosong. Latitude: -90 sampai 90; longitude: -180 sampai 180.</small>
+      <p className="report-location-hint">Browser meminta izin lokasi. Titik publik ditampilkan dengan pembulatan 3 desimal.</p>
+      <details className="report-manual-coordinates">
+        <summary>Masukkan koordinat manual</summary>
+        <div className="form-two report-coordinate-fields">
+          <div className="form-field"><label htmlFor="latitude">Latitude</label><input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" value={latitude} onChange={(event) => { setLatitude(event.target.value); setSelectedLocation(null); setLocationMessage(''); setLocationError('') }} placeholder="Contoh: -6.1752" aria-describedby="coordinate-range-hint"/></div>
+          <div className="form-field"><label htmlFor="longitude">Longitude</label><input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" value={longitude} onChange={(event) => { setLongitude(event.target.value); setSelectedLocation(null); setLocationMessage(''); setLocationError('') }} placeholder="Contoh: 106.8271" aria-describedby="coordinate-range-hint"/></div>
+        </div>
+        <small id="coordinate-range-hint" className="report-location-hint">Isi keduanya atau biarkan kosong. Latitude: -90 sampai 90; longitude: -180 sampai 180.</small>
+      </details>
+      <small className="report-map-attribution">Pencarian peta © OpenStreetMap contributors</small>
       {locationMessage ? <p className="report-location-feedback" role="status">{locationMessage}</p> : null}
       {locationError ? <p className="report-location-feedback report-location-feedback-error" role="alert">{locationError}</p> : null}
     </div>

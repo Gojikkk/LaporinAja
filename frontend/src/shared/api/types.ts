@@ -92,6 +92,12 @@ export type PublicTrendsDto = {
   label: string
 }
 
+export type GeocodingCandidateDto = {
+  latitude: number
+  longitude: number
+  displayName: string
+}
+
 export type AdminStatsDto = {
   total: number
   submissions: number
