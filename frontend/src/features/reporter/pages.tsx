@@ -1,8 +1,4 @@
-import { useCallback, useRef, useState, type FormEvent, type InputEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileCheck2, FilePlus2, Info, LocateFixed, MapPin, MessageSquareText, Search, SlidersHorizontal } from 'lucide-react'
-import { AppShell, Button, CategoryIcon, PageIntro, PrimaryReportCard, StatCard, StatusBadge, Timeline, TextField } from '../../components/ui'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type InputEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -12,29 +8,34 @@ import {
   CircleAlert,
   Clock3,
   Copy,
+  FileCheck2,
   FilePlus2,
   Info,
+  LocateFixed,
   MapPin,
+  MessageSquareText,
   MoreHorizontal,
+  Search,
   SearchX,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
   Wrench,
   XCircle,
 } from 'lucide-react'
-import { CategoryIcon, Dropdown } from '../../components/ui'
+import { Button, CategoryIcon, Dropdown, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
 import { createReport, getCategories, getMyReport, getMyReports, getPublicReport, reverseLookupReportLocation, searchReportLocations } from '../../shared/api/endpoints'
 import type { GeocodingCandidateDto } from '../../shared/api/types'
 import { useSession } from '../../shared/session'
 import { useAsync } from '../../shared/useAsync'
-import { countByStatus, latestNote, mapDetailReport, mapListReport, toCard } from '../../shared/report-store'
 import '../../styles/reporter-location.css'
 import {
   clampReportPage,
   countByStatus,
   formatDateTime,
   formatSubmitted,
+  latestNote,
   mapDetailReport,
   mapListReport,
   publicStatuses,
@@ -1071,7 +1072,7 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
 
   const options = categories ?? []
 
-  return <AppShell mode="reporter"><main className="page container narrow-page"><Link to="/dashboard" className="back-link"><ArrowLeft size={16}/> Kembali ke dashboard</Link><PageIntro title="Ceritakan temuanmu." description="Informasi yang jelas membantu laporan ditinjau dengan lebih mudah."/><div className="demo-banner"><Info size={18}/><span>Laporan barumu hanya dapat dilihat olehmu sampai ditinjau administrator platform.</span></div><form ref={formRef} className="content-panel report-form" onSubmit={submit} onInput={handleLocationInput}>
+  return <ReporterShell crumb="Buat laporan"><div className="app-theme app-public"><div className="page container narrow-page"><Link to="/dashboard" className="back-link"><ArrowLeft size={16}/> Kembali ke dashboard</Link><PageIntro title="Ceritakan temuanmu." description="Informasi yang jelas membantu laporan ditinjau dengan lebih mudah."/><div className="demo-banner"><Info size={18}/><span>Laporan barumu hanya dapat dilihat olehmu sampai ditinjau administrator platform.</span></div><form ref={formRef} className="content-panel report-form" onSubmit={submit} onInput={handleLocationInput}>
     <div className="form-section-title"><span>01</span><div><h2>Jenis masalah</h2><p>Pilih kategori yang paling sesuai.</p></div></div>
     <div className="form-field"><label htmlFor="categoryId">Kategori *</label><select id="categoryId" name="categoryId" required defaultValue=""><option value="" disabled>{categoryLoading ? 'Memuat kategori…' : 'Pilih kategori laporan'}</option>{options.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>{categoryError ? <small>Kategori tidak dapat dimuat. Coba muat ulang halaman.</small> : null}</div>
     <div className="form-section-title"><span>02</span><div><h2>Detail laporan</h2><p>Jelaskan apa yang kamu temukan.</p></div></div>
@@ -1116,149 +1117,5 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     <div className="privacy-hint"><Info size={15}/> Hindari foto wajah, plat nomor, atau informasi pribadi.</div>
     <div className="auth-error" role="alert">{error}</div>
     <div className="form-actions"><Button to="/dashboard" variant="outline">Simpan nanti</Button><button className="button primary" type="submit" disabled={busy}>{busy ? 'Mengirim…' : 'Kirim laporan'} <ArrowRight size={16}/></button></div>
-  </form></main></AppShell>
-}
-
-export function PrivateDetail() {
-  const { code = '' } = useParams()
-  const load = useCallback(() => getMyReport(code), [code])
-  const { data, error, loading } = useAsync(load, [code])
-  const primaryCode = data?.duplicateOf?.code
-  const loadPrimary = useCallback(() => primaryCode ? getPublicReport(primaryCode) : Promise.resolve(null), [primaryCode])
-  const { data: primaryDetail } = useAsync(loadPrimary, [primaryCode])
-
-  if (loading) return <Loading label="Memuat laporan" />
-  if (error || !data) {
-    return <AppShell mode="reporter"><main className="page container"><Link to="/dashboard" className="back-link"><ArrowLeft size={16}/> Kembali ke laporan saya</Link><div className="empty-state"><Search size={25}/><h2>Laporan tidak ditemukan</h2><p>{error instanceof ApiError ? error.message : 'Laporan ini tidak ada pada akunmu.'}</p><Button to="/dashboard" variant="outline">Kembali ke dashboard</Button></div></main></AppShell>
-  }
-
-  const found = mapDetailReport(data)
-  const report = toCard(found)
-  const notes = found.history
-  const last = latestNote(found)
-  const primary = primaryDetail ? toCard(mapDetailReport(primaryDetail)) : undefined
-
-  return <AppShell mode="reporter"><main className="page container">
-    <Link to="/dashboard" className="back-link"><ArrowLeft size={16}/> Kembali ke laporan saya</Link>
-    <div className="detail-heading"><div><div className="eyebrow"><span/> {report.code} · LAPORAN PRIBADI</div><h1>{report.title}</h1><div className="detail-meta"><span>{report.category}</span><span>·</span><MapPin size={14}/><span>{report.village}, {report.district}</span></div></div><StatusBadge status={report.status}/></div>
-    <div className="detail-layout">
-      <div className="detail-main">
-        <div className={`detail-art report-art ${report.tone}`}>{report.thumbnailUrl ? <img className="report-thumb" src={mediaSrc(report.thumbnailUrl)} alt={`Foto laporan ${report.code}`} crossOrigin="use-credentials"/> : <span className="art-symbol"><CategoryIcon category={report.category} size={52}/></span>}</div>
-        {report.status === 'DUPLICATE' ? <PrimaryReportCard report={report} primary={primary}/> : null}
-        <section className="detail-block"><h2>Deskripsi laporan</h2><p>{report.description}</p></section>
-        <section className="detail-block"><h2>{primary ? 'Catatan penggabungan' : 'Alasan atau catatan'}</h2><div className="follow-card"><span className="follow-icon"><MessageSquareText size={17}/></span><div><b>{last.title}</b><p>{last.note}</p><small>Administrator platform · {last.at}</small></div></div></section>
-  return (
-    <ReporterShell crumb="Buat laporan">
-      <div className="rep-page rep-page-narrow">
-        <Link className="rep-back" to="/dashboard">
-          <ArrowLeft size={15} aria-hidden="true" /> Kembali ke dashboard
-        </Link>
-        <header className="rep-head">
-          <h1>Ceritakan temuanmu.</h1>
-          <p>Informasi yang jelas membantu laporan ditinjau dengan lebih mudah.</p>
-        </header>
-        <div className="rep-banner tone-info">
-          <Info size={18} aria-hidden="true" />
-          <div>
-            <b>Laporan barumu hanya bisa dilihat olehmu</b>
-            <p>Laporan baru akan tampil pada halaman publik setelah diverifikasi administrator platform.</p>
-          </div>
-        </div>
-        <form className="content-panel report-form" onSubmit={submit}>
-          <div className="form-section-title">
-            <span>01</span>
-            <div>
-              <h2>Jenis masalah</h2>
-              <p>Pilih kategori yang paling sesuai.</p>
-            </div>
-          </div>
-          <div className="form-field">
-            <label htmlFor="categoryId">Kategori *</label>
-            <select id="categoryId" name="categoryId" required defaultValue="">
-              <option value="" disabled>
-                {categoryLoading ? 'Memuat kategori…' : 'Pilih kategori laporan'}
-              </option>
-              {options.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-            {categoryError ? <small>Kategori tidak dapat dimuat. Coba muat ulang halaman.</small> : null}
-          </div>
-          <div className="form-section-title">
-            <span>02</span>
-            <div>
-              <h2>Detail laporan</h2>
-              <p>Jelaskan apa yang kamu temukan.</p>
-            </div>
-          </div>
-          <div className="form-field">
-            <label htmlFor="title">Judul laporan *</label>
-            <input id="title" name="title" type="text" required minLength={10} maxLength={100} placeholder="Contoh: Lampu jalan padam dekat taman" />
-            <small>10-100 karakter</small>
-          </div>
-          <div className="form-field">
-            <label htmlFor="description">Deskripsi *</label>
-            <textarea id="description" name="description" required minLength={30} maxLength={1000} rows={5} placeholder="Ceritakan kondisi dan kapan kamu menemukannya." />
-            <small>30-1.000 karakter</small>
-          </div>
-          <div className="form-section-title">
-            <span>03</span>
-            <div>
-              <h2>Wilayah</h2>
-              <p>Gunakan patokan umum, bukan alamat rumah.</p>
-            </div>
-          </div>
-          <div className="form-two">
-            <div className="form-field">
-              <label htmlFor="city">Kota/kabupaten *</label>
-              <input id="city" name="city" type="text" required placeholder="Contoh: Bandung" />
-            </div>
-            <div className="form-field">
-              <label htmlFor="district">Kecamatan *</label>
-              <input id="district" name="district" type="text" required placeholder="Nama kecamatan" />
-            </div>
-          </div>
-          <div className="form-field">
-            <label htmlFor="village">Kelurahan/desa *</label>
-            <input id="village" name="village" type="text" required placeholder="Nama kelurahan atau desa" />
-          </div>
-          <div className="form-field">
-            <label htmlFor="locationDetail">Patokan lokasi *</label>
-            <input id="locationDetail" name="locationDetail" type="text" required placeholder="Contoh: depan taman lingkungan" />
-            <small>Hindari alamat rumah pribadi.</small>
-          </div>
-          <div className="form-section-title">
-            <span>04</span>
-            <div>
-              <h2>Foto pendukung</h2>
-              <p>Unggah 1-3 foto, maksimal 5 MB per foto.</p>
-            </div>
-          </div>
-          <label className="upload-field" htmlFor="photos">
-            <FilePlus2 size={22} aria-hidden="true" />
-            <b>Pilih foto dari perangkat</b>
-            <span>1–3 foto JPG, PNG, atau WebP · Maksimal 5 MB per foto</span>
-            <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required />
-          </label>
-          <div className="privacy-hint">
-            <Info size={15} aria-hidden="true" /> Hindari foto wajah, plat nomor, atau informasi pribadi.
-          </div>
-          <div className="auth-error" role="alert">
-            {error}
-          </div>
-          <div className="form-actions">
-            <Link className="rep-btn rep-btn-outline" to="/dashboard">
-              Simpan nanti
-            </Link>
-            <button className="rep-btn" type="submit" disabled={busy}>
-              {busy ? 'Mengirim…' : 'Kirim laporan'}
-              <ArrowRight size={16} aria-hidden="true" />
-            </button>
-          </div>
-        </form>
-      </div>
-    </ReporterShell>
-  )
+  </form></div></div></ReporterShell>
 }
