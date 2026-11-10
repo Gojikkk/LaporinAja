@@ -58,7 +58,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Tes E2E mencakup alur utama pelapor dan admin, serta pemeriksaan aksesibilitas dengan axe.
+Tes E2E mencakup alur utama pelapor dan admin, statistik publik dan admin, serta pemeriksaan aksesibilitas dengan axe.
 
 ---
 
