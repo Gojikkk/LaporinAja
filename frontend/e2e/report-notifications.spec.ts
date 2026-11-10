@@ -18,7 +18,8 @@ async function openReporterDashboard(page: Page) {
     json: { data: [], meta: { page: 1, limit: 3, total: 0 }, counts: {} },
   }))
   await page.goto('/dashboard')
-  await expect(page.getByRole('heading', { name: 'Halo, Pelapor QA' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Dashboard Saya' })).toBeVisible()
+  await expect(page.getByText('Halo, Pelapor QA')).toBeVisible()
   const mobileMenu = page.getByRole('button', { name: 'Buka navigasi' })
   if (await mobileMenu.isVisible()) await mobileMenu.click()
 }
