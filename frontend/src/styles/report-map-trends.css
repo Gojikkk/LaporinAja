@@ -86,6 +86,10 @@
   font-weight: 800;
 }
 
+.app-theme .panel-head > .demo-label {
+  color: #854a22;
+}
+
 .trend-disclaimer {
   margin: 0 0 14px;
 }

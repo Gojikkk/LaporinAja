@@ -48,6 +48,18 @@ Vite membuka frontend pada `http://localhost:5173`.
 
 Untuk build produksi: `npm run build` → hasil di folder `dist/`.
 
+### Jalankan tes end-to-end
+
+Dari folder `frontend/`, instal dependensi dan browser Chromium sekali, lalu jalankan Playwright:
+
+```sh
+npm install
+npx playwright install chromium
+npm run test:e2e
+```
+
+Tes E2E mencakup alur statistik publik dan admin, termasuk pemeriksaan aksesibilitas dengan axe.
+
 ---
 
 ## Progress Saat Ini
