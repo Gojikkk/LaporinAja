@@ -1,1 +1,1 @@
-export { Dashboard, CreateReport, PrivateDetail } from './pages'
+export { Dashboard, MyReports, CreateReport, PrivateDetail } from './pages'

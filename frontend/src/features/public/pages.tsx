@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, CheckCircle2, Clock3, FileCheck2, 
 import { AppShell, Button, CategoryIcon, Dropdown, PageIntro, PrimaryReportCard, ReportCard, ReportListCard, StatCard, StatusBadge, Timeline } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
 import { getAdminStats, getCategories, getPublicReport, getPublicReports, getPublicStats, getPublicTrends } from '../../shared/api/endpoints'
-import type { PublicTrendsDto } from '../../shared/api/types'
+import type { AdminStatsDto, PublicStatsDto, PublicTrendsDto } from '../../shared/api/types'
 import { useAsync } from '../../shared/useAsync'
 import { initialCategories, statusInfo, type Status } from '../../shared/report-data'
 import { clampReportPage, formatSubmitted, latestNote, mapDetailReport, mapListReport, publicStatuses, reportPageCount, reportPageWindow, toCard } from '../../shared/report-store'
@@ -13,7 +13,7 @@ import '../../styles/report-map-trends.css'
 const emptyCounts: Record<Status, number> = { SUBMITTED: 0, VERIFIED: 0, IN_PROGRESS: 0, RESOLVED: 0, REJECTED: 0, DUPLICATE: 0 }
 
 function ErrorNote({ message }: { message: string }) {
-  return <div className="empty-state"><SearchX size={28}/><h2>Data tidak dapat dimuat</h2><p>{message}</p></div>
+  return <div className="empty-state" role="alert"><SearchX size={28}/><h2>Data tidak dapat dimuat</h2><p>{message}</p></div>
 }
 
 function formatTrendMonth(month: string) {
@@ -491,23 +491,22 @@ export function Detail() {
 }
 
 export function Statistics({ admin = false }: { admin?: boolean }) {
-  const loadPublicStats = useCallback(() => getPublicStats(), [])
+  const loadStats = useCallback(async (): Promise<AdminStatsDto | PublicStatsDto> => admin ? getAdminStats() : getPublicStats(), [admin])
   const loadTrends = useCallback(() => getPublicTrends(), [])
-  const loadAdminStats = useCallback(() => admin ? getAdminStats() : Promise.resolve(null), [admin])
-  const { data: publicStats, error } = useAsync(loadPublicStats, [])
+  const { data: stats, error, loading: statsLoading } = useAsync<AdminStatsDto | PublicStatsDto>(loadStats, [admin])
   const { data: trends, error: trendsError, loading: trendsLoading, reload: reloadTrends } = useAsync(loadTrends, [])
-  const { data: adminStats } = useAsync(loadAdminStats, [admin])
 
-  const counts = (admin ? adminStats?.byStatus : publicStats?.byStatus) ?? emptyCounts
-  const total = admin ? (adminStats?.total ?? 0) : (publicStats?.total ?? 0)
+  const adminStats = admin && stats && 'verificationRate' in stats ? stats : null
+  const counts = stats?.byStatus ?? emptyCounts
+  const total = stats?.total ?? 0
   const pct = (n: number) => total ? Math.round((n / total) * 100) : 0
-  const byCategory = (publicStats?.byCategory ?? []).map((row) => [row.name, row.count] as [string, number]).sort((a, b) => b[1] - a[1])
+  const byCategory = (stats?.byCategory ?? []).map((row) => [row.name, row.count] as [string, number]).sort((a, b) => b[1] - a[1])
   const categoryTotal = byCategory.reduce((sum, [, count]) => sum + count, 0)
   const bars: [string, number, string][] = [['Terverifikasi', counts.VERIFIED, 'verified'], ['Dalam tindak lanjut', counts.IN_PROGRESS, 'progress'], ['Selesai dicatat', counts.RESOLVED, 'resolved'], ['Laporan serupa', counts.DUPLICATE, 'duplicate']]
 
   return <AppShell mode={admin ? 'admin' : 'public'}><main className="page container">
     <PageIntro title="Statistik laporan" description={admin ? 'Ringkasan operasional dari seluruh laporan di ruang admin.' : 'Angka di halaman ini dihitung langsung dari laporan yang sudah ditinjau administrator.'}/>
-    {error ? <ErrorNote message={error instanceof ApiError ? error.message : 'Statistik belum dapat dimuat.'}/> : <>
+    {statsLoading ? <p className="trend-feedback" role="status">Memuat statistik laporan…</p> : error ? <ErrorNote message={error instanceof ApiError ? error.message : 'Statistik belum dapat dimuat.'}/> : <>
     <div className="stats-grid stats-page-grid">
       {admin ? <>
         <StatCard label="Total laporan" value={String(adminStats?.total ?? 0)} detail="seluruh status" icon={<FileCheck2 size={19}/>}/>
@@ -526,7 +525,7 @@ export function Statistics({ admin = false }: { admin?: boolean }) {
         {bars.map(([name, value, tone]) => <div className="bar-row" key={name}><div><span>{name}</span><b>{pct(value)}%</b></div><div className="bar-track"><i className={tone} style={{ width: `${pct(value)}%` }}/></div></div>)}
         <small className="chart-note">Persentase dihitung dari {admin ? 'seluruh laporan' : 'laporan yang tampil di halaman publik'}.</small>
       </section>
-      <section className="panel"><div className="panel-head"><div><h2>Menurut kategori</h2><p>Kategori pada laporan publik</p></div></div>
+      <section className="panel"><div className="panel-head"><div><h2>Menurut kategori</h2><p>Kategori pada {admin ? 'seluruh laporan' : 'laporan publik'}</p></div></div>
         {byCategory.slice(0, 5).map(([name, value]) => <div className="category-row" key={name}><span className="category-dot"/><span>{name}</span><b>{categoryTotal ? Math.round((value / categoryTotal) * 100) : 0}%</b></div>)}
         {byCategory.length === 0 ? <p className="chart-note">Belum ada data kategori.</p> : null}
       </section>

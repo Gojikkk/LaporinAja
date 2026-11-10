@@ -4,7 +4,7 @@ import { Toast } from '../components/ui'
 import { AuthPage } from '../features/auth'
 import { Admin, AdminDetail, AdminQueue, AdminCategories } from '../features/admin'
 import { Home, Reports, Detail, Statistics, About, Privacy } from '../features/public'
-import { Dashboard, CreateReport, PrivateDetail } from '../features/reporter'
+import { Dashboard, MyReports, CreateReport, PrivateDetail } from '../features/reporter'
 import { Forbidden, NotFound } from '../features/system'
 import { useSession } from '../shared/session'
 
@@ -33,6 +33,7 @@ function Routed({ onToast }: { onToast: (s: string) => void }) {
         <Route path="/masuk" element={<AuthPage onToast={onToast} />} />
         <Route path="/daftar" element={<AuthPage register onToast={onToast} />} />
         <Route path="/dashboard" element={<RequireRole role="PELAPOR"><Dashboard /></RequireRole>} />
+        <Route path="/dashboard/laporan" element={<RequireRole role="PELAPOR"><MyReports /></RequireRole>} />
         <Route path="/lapor/baru" element={<RequireRole role="PELAPOR"><CreateReport onToast={onToast} /></RequireRole>} />
         <Route path="/dashboard/laporan/:code" element={<RequireRole role="PELAPOR"><PrivateDetail /></RequireRole>} />
         <Route path="/admin" element={<RequireRole role="ADMIN"><Admin /></RequireRole>} />

@@ -48,6 +48,18 @@ Vite membuka frontend pada `http://localhost:5173`.
 
 Untuk build produksi: `npm run build` → hasil di folder `dist/`.
 
+### Jalankan tes end-to-end
+
+Dari folder `frontend/`, instal dependensi dan browser Chromium sekali, lalu jalankan Playwright:
+
+```sh
+npm install
+npx playwright install chromium
+npm run test:e2e
+```
+
+Tes E2E mencakup alur utama pelapor dan admin, statistik publik dan admin, serta pemeriksaan aksesibilitas dengan axe.
+
 ---
 
 ## Progress Saat Ini
@@ -61,7 +73,9 @@ Frontend menyediakan UI untuk halaman dan alur berikut:
 | Pembuatan laporan | ✅ | Form multipart dengan upload foto |
 | Daftar laporan publik | ✅ | Filter kategori, status, wilayah |
 | Detail laporan publik | ✅ | Riwayat status + bukti tindak lanjut |
-| Dashboard pelapor | ✅ | Daftar laporan milik sendiri + tracking |
+| Dashboard pelapor | ✅ | Sidebar pelapor, 6 kartu status, state kosong/error |
+| Laporan Saya (pelapor) | ✅ | Daftar lengkap + filter status/kategori + pagination |
+| Pelacakan laporan saya | ✅ | Detail per status: bukti selesai, referensi duplikat, alasan penolakan |
 | Dashboard admin | ✅ | Antrean laporan, aksi verifikasi/tolak |
 | Manajemen kategori admin | ✅ | CRUD kategori (FR-023 / Should Have) |
 | Halaman statistik | ✅ | Statistik dasar laporan |
@@ -81,7 +95,8 @@ src/
   features/
     public/pages.tsx            landing, reports, detail, statistics, about, privacy
     auth/pages.tsx              login and registration
-    reporter/pages.tsx          reporter dashboard, report form, private tracking
+    reporter/pages.tsx          reporter dashboard, Laporan Saya list, report form, private tracking
+    reporter/shell.tsx          reporter workspace navigation and page title (LAP-22)
     admin/pages.tsx             admin dashboard, report queue, report review
     admin/categories.tsx        admin report category management (LAP-30)
     admin/shell.tsx             admin workspace navigation and page title
@@ -94,6 +109,7 @@ src/
     report-store.ts             demo report store shared by admin, public, reporter
   styles/global.css             responsive global design system
   styles/admin.css              admin workspace (LAP-23/LAP-30 theme, .adm)
+  styles/reporter.css           reporter workspace (LAP-22 theme, .rep)
   styles/theme.css              shared LAP-23 theme for public/reporter (.app-theme)
   styles/home.css               Beranda layout (hero, kategori, statistik, penutup)
   main.tsx                      React entry point and BrowserRouter
@@ -129,7 +145,7 @@ Vite membaca nilai `VITE_*` saat build. Atur URL sesuai environment dan bangun u
 
 Publik: `/`, `/laporan`, `/laporan/:code`, `/statistik`, `/tentang`, `/kebijakan-privasi`, `/masuk`, `/daftar`.
 
-Pelapor: `/dashboard`, `/lapor/baru`, `/dashboard/laporan/:code`.
+Pelapor: `/dashboard`, `/dashboard/laporan`, `/dashboard/laporan/:code`, `/lapor/baru`.
 
 Administrator platform: `/admin`, `/admin/laporan`, `/admin/laporan/:code`, `/admin/kategori`, `/admin/statistik`.
 
@@ -137,4 +153,4 @@ Halaman sistem: `/403` untuk akses ditolak; rute lain yang tidak dikenal menampi
 
 ## Responsif dan aksesibilitas
 
-Layout dimulai dari layar kecil, dengan breakpoint 430, 760, dan 1000 px untuk halaman publik/pelapor, serta 640, 900, dan 1400 px untuk ruang kerja admin. Pada ukuran penerimaan 360, 768, dan 1280 px konten mengalir tanpa lebar tetap. Status selalu berikon dan berteks, field memiliki label, kontrol interaktif memiliki fokus terlihat, serta tinggi tombol minimum 44 px. Warna status memakai pasangan latar/teks gelap; aksi utama memakai oranye #F97316 dengan teks navy #0F172A yang tetap sama saat hover (tanpa perubahan warna teks, transparansi, atau bayangan tambahan).
+Layout dimulai dari layar kecil, dengan breakpoint 430, 760, dan 1000 px untuk halaman publik, 640, 900, dan 1024 px untuk ruang kerja pelapor, serta 640, 900, dan 1400 px untuk ruang kerja admin. Pada ukuran penerimaan 360, 768, dan 1280 px konten mengalir tanpa lebar tetap. Status selalu berikon dan berteks, field memiliki label, kontrol interaktif memiliki fokus terlihat, serta tinggi tombol minimum 44 px. Warna status memakai pasangan latar/teks gelap; aksi utama memakai oranye #F97316 dengan teks navy #0F172A yang tetap sama saat hover (tanpa perubahan warna teks, transparansi, atau bayangan tambahan).
