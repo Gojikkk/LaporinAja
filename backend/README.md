@@ -48,6 +48,11 @@ npm run dev
 API tersedia di **http://localhost:3000**
 Dokumentasi Swagger di **http://localhost:3000/api-docs**
 
+Pencarian titik lokasi laporan memakai Nominatim OpenStreetMap melalui backend. Endpoint hanya
+dipanggil setelah pelapor menekan tombol pencarian, hasilnya di-cache 24 jam, dan permintaan
+upstream dijarak minimal 1,1 detik. Atur `GEOCODING_SEARCH_URL` untuk mengganti provider dan
+`GEOCODING_USER_AGENT` untuk mengidentifikasi aplikasi ke provider.
+
 > Atau jalankan Docker Compose dari root repository: `docker compose up --build` (tidak perlu install PostgreSQL manual). Salin `backend/.env.example` ke `.env` di root repository dan isi kredensial Cloudinary terlebih dahulu.
 
 ### Menjalankan frontend
