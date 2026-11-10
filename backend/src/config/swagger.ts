@@ -75,6 +75,40 @@ const components = {
       },
       required: ["id", "name", "slug"],
     },
+    GeocodingCandidate: {
+      type: "object",
+      properties: {
+        latitude: { type: "number", example: -6.1752 },
+        longitude: { type: "number", example: 106.8271 },
+        displayName: { type: "string", example: "Taman Kota, Bandung, Jawa Barat, Indonesia" },
+        address: {
+          type: "object",
+          properties: {
+            city: { type: "string", example: "Bandung" },
+            district: { type: "string", example: "Coblong" },
+            village: { type: "string", example: "Dago" },
+            locationDetail: { type: "string", example: "Taman Kota" },
+          },
+        },
+      },
+      required: ["latitude", "longitude", "displayName"],
+    },
+    GeocodedAddress: {
+      type: "object",
+      properties: {
+        displayName: { type: "string", example: "Taman Kota, Bandung, Indonesia" },
+        address: {
+          type: "object",
+          properties: {
+            city: { type: "string", example: "Bandung" },
+            district: { type: "string", example: "Coblong" },
+            village: { type: "string", example: "Dago" },
+            locationDetail: { type: "string", example: "Taman Kota" },
+          },
+        },
+      },
+      required: ["displayName"],
+    },
     AdminCategory: {
       allOf: [
         { $ref: "#/components/schemas/Category" },
@@ -318,6 +352,10 @@ const components = {
     },
   },
   responses: {
+    "400": {
+      description: "Parameter permintaan tidak valid",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+    },
     "401": {
       description: "Tidak terautentikasi",
       content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
@@ -336,6 +374,10 @@ const components = {
     },
     "429": {
       description: "Rate limit tercapai",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+    },
+    "500": {
+      description: "Kesalahan internal server",
       content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
     },
   },
@@ -556,6 +598,98 @@ const paths: Record<string, any> = {
               },
             },
           },
+        },
+      },
+    },
+  },
+
+  "/api/location/search": {
+    get: {
+      tags: ["My Reports"],
+      summary: "Cari kandidat titik lokasi laporan",
+      description: "Hanya PELAPOR yang login. Pencarian dilakukan atas permintaan pengguna, dibatasi ke Indonesia, dan mengembalikan maksimal 5 kandidat. Atribusi OpenStreetMap wajib ditampilkan.",
+      security: [{ cookieAuth: [] }],
+      parameters: [{
+        in: "query",
+        name: "q",
+        required: true,
+        schema: { type: "string", minLength: 3, maxLength: 600 },
+        description: "Patokan dan wilayah lokasi laporan.",
+      }],
+      responses: {
+        "200": {
+          description: "Kandidat lokasi",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: { type: "array", items: { $ref: "#/components/schemas/GeocodingCandidate" } },
+                },
+              },
+            },
+          },
+        },
+        "400": { $ref: "#/components/responses/400" },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "502": {
+          description: "Layanan geocoding tidak tersedia atau memberikan respons tidak valid",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+        },
+        "504": {
+          description: "Layanan geocoding melewati batas waktu",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+        },
+      },
+    },
+  },
+
+  "/api/location/reverse": {
+    get: {
+      tags: ["My Reports"],
+      summary: "Cari alamat berdasarkan lokasi perangkat",
+      description: "Hanya PELAPOR yang login. Mengubah koordinat pilihan pengguna menjadi komponen alamat untuk membantu mengisi wilayah laporan.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        {
+          in: "query",
+          name: "lat",
+          required: true,
+          schema: { type: "number", minimum: -90, maximum: 90 },
+          description: "Latitude yang diberikan browser setelah pengguna memilih Gunakan lokasi saya.",
+        },
+        {
+          in: "query",
+          name: "lon",
+          required: true,
+          schema: { type: "number", minimum: -180, maximum: 180 },
+          description: "Longitude yang diberikan browser setelah pengguna memilih Gunakan lokasi saya.",
+        },
+      ],
+      responses: {
+        "200": {
+          description: "Alamat dari titik koordinat",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { data: { $ref: "#/components/schemas/GeocodedAddress" } },
+              },
+            },
+          },
+        },
+        "400": { $ref: "#/components/responses/400" },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "404": { description: "Alamat untuk titik lokasi tidak ditemukan" },
+        "502": {
+          description: "Layanan geocoding tidak tersedia atau memberikan respons tidak valid",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+        },
+        "504": {
+          description: "Layanan geocoding melewati batas waktu",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
         },
       },
     },

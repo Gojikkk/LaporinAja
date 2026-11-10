@@ -71,6 +71,9 @@ export const env = {
   cloudinaryApiKey,
   cloudinaryApiSecret,
   cloudinaryFolder: process.env.CLOUDINARY_FOLDER ?? "laporinaja",
+  geocodingSearchUrl: process.env.GEOCODING_SEARCH_URL ?? "https://nominatim.openstreetmap.org/search",
+  geocodingUserAgent: process.env.GEOCODING_USER_AGENT ??
+    "LaporinAja/1.0 (https://github.com/Gojikkk/LaporinAja)",
   smtp: smtpConfigured
     ? {
         host: smtpHost!,
