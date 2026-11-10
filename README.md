@@ -95,6 +95,19 @@ Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan s
 
 **Batasan plan Free:** API akan sleep setelah 15 menit tanpa trafik dan perlu sekitar satu menit untuk bangun saat ada request. Database Free dibatasi 1 GB dan otomatis kedaluwarsa setelah 30 hari; data database akan dihapus setelah masa tenggang jika tidak di-upgrade. Static Site gratis. Cek pemakaian bandwidth/build dan spend limit di dashboard Render agar tidak kena biaya tambahan.
 
+### CI/CD otomatis ke Render
+
+Workflow [GitHub Actions](./.github/workflows/ci-cd.yml) menjalankan tes backend, build backend, dan build frontend pada setiap push serta pull request ke `main`. Deploy hanya berjalan setelah semua job tersebut berhasil dan commit masuk ke `main` (atau workflow dijalankan manual pada `main`).
+
+Untuk mengaktifkan deploy:
+
+1. Di Render, buat deploy hook terpisah pada service `laporinaja-staging-api` dan `laporinaja-staging-web`.
+2. Di GitHub, buka **Settings → Secrets and variables → Actions → New repository secret** dan simpan URL hook API sebagai `RENDER_API_DEPLOY_HOOK`, serta URL hook frontend sebagai `RENDER_WEB_DEPLOY_HOOK`.
+3. Hubungkan Blueprint Render ke branch `main`. `autoDeployTrigger: off` mencegah Render melewati pemeriksaan CI dan hanya deploy saat workflow memanggil kedua hook.
+4. Buka **Actions** di GitHub untuk melihat hasil tes/build dan status pemicu deploy. Pantau penyelesaian deploy serta health check masing-masing service di Render.
+
+Jangan masukkan URL deploy hook atau kredensial ke repository, issue, maupun chat. Workflow ini mendeploy konfigurasi staging Render yang tersedia di repository; database Free tetap sementara dan tidak cocok untuk menyimpan data production jangka panjang.
+
 ### Preview publik sementara tanpa kartu
 
 Di Windows, jalankan `Start-Staging.bat` dari root repository. Script menyalakan Docker Desktop jika perlu, database staging lokal, API, frontend, dan Cloudflare Quick Tunnel. Untuk cek kebutuhan tanpa menyalakan preview, jalankan `.\start-staging.ps1 -CheckOnly`. URL publik serta akun admin demo akan ditampilkan di terminal. Pada database baru, script mengisi data demo dengan password admin acak yang disimpan di `%LOCALAPPDATA%\LaporinAja\staging-admin-password.txt`; jangan bagikan. Biarkan terminal tetap terbuka selama preview dipakai, lalu tekan `Ctrl+C` untuk berhenti. Database preview tetap tersimpan di Docker volume lokal.

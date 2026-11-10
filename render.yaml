@@ -10,6 +10,7 @@ services:
     name: laporinaja-staging-api
     runtime: docker
     plan: free
+    autoDeployTrigger: off
     region: singapore
     rootDir: backend
     dockerfilePath: ./Dockerfile
@@ -39,6 +40,7 @@ services:
   - type: web
     name: laporinaja-staging-web
     runtime: static
+    autoDeployTrigger: off
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
