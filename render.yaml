@@ -27,6 +27,8 @@ services:
         value: "true"
       - key: SESSION_COOKIE_SAME_SITE
         value: none
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
