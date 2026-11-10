@@ -1,0 +1,14 @@
+[build]
+  base = "frontend"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  VITE_CSRF_ENDPOINT = "/auth/csrf"
+  VITE_CSRF_HEADER_NAME = "X-CSRF-Token"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
