@@ -1003,6 +1003,10 @@ html:has(.app-theme) body {
   color: #fff;
 }
 
+.app-theme .auth-brand > span:last-child > span {
+  color: var(--app-on-dark-accent);
+}
+
 .app-theme .auth-brand .brand-mark {
   background: #ffffff1a;
   color: #7dd3d0;
@@ -1098,6 +1102,10 @@ html:has(.app-theme) body {
 
 .app-theme .upload-field b {
   color: var(--app-navy);
+}
+
+.app-theme .upload-field input {
+  color: var(--app-body);
 }
 
 /* ----------------------------------------------------- dashboard pelapor */
