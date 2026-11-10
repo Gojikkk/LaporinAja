@@ -4,14 +4,96 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, CheckCircle2, Clock3, FileCheck2, 
 import { AppShell, Button, CategoryIcon, Dropdown, PageIntro, PrimaryReportCard, ReportCard, ReportListCard, StatCard, StatusBadge, Timeline } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
 import { getAdminStats, getCategories, getPublicReport, getPublicReports, getPublicStats, getPublicTrends } from '../../shared/api/endpoints'
+import type { PublicTrendsDto } from '../../shared/api/types'
 import { useAsync } from '../../shared/useAsync'
 import { initialCategories, statusInfo, type Status } from '../../shared/report-data'
 import { clampReportPage, formatSubmitted, latestNote, mapDetailReport, mapListReport, publicStatuses, reportPageCount, reportPageWindow, toCard } from '../../shared/report-store'
+import '../../styles/report-map-trends.css'
 
 const emptyCounts: Record<Status, number> = { SUBMITTED: 0, VERIFIED: 0, IN_PROGRESS: 0, RESOLVED: 0, REJECTED: 0, DUPLICATE: 0 }
 
 function ErrorNote({ message }: { message: string }) {
   return <div className="empty-state"><SearchX size={28}/><h2>Data tidak dapat dimuat</h2><p>{message}</p></div>
+}
+
+function formatTrendMonth(month: string) {
+  const date = new Date(`${month}-01T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? month : date.toLocaleDateString('id-ID', { month: 'short', timeZone: 'UTC' })
+}
+
+function TrendChart({ trends, loading, error, onRetry }: {
+  trends: PublicTrendsDto | null
+  loading: boolean
+  error: unknown
+  onRetry: () => void
+}) {
+  const months = [...new Set((trends?.byCategory ?? []).flatMap((category) => category.months.map((month) => month.month)))].sort()
+  const rows = (trends?.byCategory ?? [])
+    .map((category) => ({
+      ...category,
+      months: months.map((month) => category.months.find((entry) => entry.month === month)?.count ?? 0),
+      total: category.months.reduce((sum, month) => sum + month.count, 0),
+    }))
+    .filter((category) => category.total > 0)
+    .sort((a, b) => b.total - a.total)
+  const maxCount = Math.max(1, ...rows.flatMap((category) => category.months))
+
+  return <section className="panel trend-panel" aria-labelledby="trend-title">
+    <div className="panel-head trend-head">
+      <div><h2 id="trend-title">Tren kategori dan periode</h2><p>Agregat laporan per kategori dan bulan.</p></div>
+      <span className="demo-label">Data demonstrasi</span>
+    </div>
+    <p className="chart-note trend-disclaimer">Data demonstrasi, bukan gambaran kondisi nyata di lapangan.</p>
+    {loading ? <p className="trend-feedback" role="status">Memuat tren laporan…</p> : error ? <div className="trend-feedback" role="alert">
+      <p>{error instanceof ApiError ? error.message : 'Tren laporan belum dapat dimuat.'}</p>
+      <Button variant="outline" onClick={onRetry}>Coba lagi</Button>
+    </div> : rows.length === 0 || months.length === 0 ? <p className="trend-feedback">Belum ada data tren untuk ditampilkan.</p> : <div className="trend-scroll" role="region" aria-label="Tren laporan per kategori dan bulan" tabIndex={0}>
+      <table className="trend-table">
+        <thead><tr><th scope="col">Kategori</th>{months.map((month) => <th scope="col" key={month}>{formatTrendMonth(month)}</th>)}</tr></thead>
+        <tbody>{rows.map((category) => <tr key={category.slug}>
+          <th scope="row"><span>{category.name}</span><small>{category.total} laporan</small></th>
+          {category.months.map((count, index) => <td key={months[index]} aria-label={`${category.name}, ${months[index]}: ${count} laporan`}>
+            <span className="trend-bar-track"><span className="trend-bar" style={{ height: `${count === 0 ? 0 : Math.max(8, (count / maxCount) * 100)}%` }}/></span>
+            <span className="trend-count">{count}</span>
+          </td>)}
+        </tr>)}</tbody>
+      </table>
+    </div>}
+  </section>
+}
+
+function ReportLocationMap({ latitude, longitude }: { latitude: number; longitude: number }) {
+  const [failed, setFailed] = useState(false)
+  const publicLatitude = Number(latitude.toFixed(3))
+  const publicLongitude = Number(longitude.toFixed(3))
+  const mapParams = new URLSearchParams({
+    bbox: `${(publicLongitude - 0.01).toFixed(3)},${(publicLatitude - 0.01).toFixed(3)},${(publicLongitude + 0.01).toFixed(3)},${(publicLatitude + 0.01).toFixed(3)}`,
+    layer: 'mapnik',
+    marker: `${publicLatitude},${publicLongitude}`,
+  })
+  const mapUrl = `https://www.openstreetmap.org/export/embed.html?${mapParams.toString()}`
+  const mapPageUrl = `https://www.openstreetmap.org/?mlat=${publicLatitude}&mlon=${publicLongitude}#map=16/${publicLatitude}/${publicLongitude}`
+
+  useEffect(() => setFailed(false), [publicLatitude, publicLongitude])
+
+  return <section className="report-location-map" aria-labelledby="report-map-title">
+    <div className="report-map-heading">
+      <div><h2 id="report-map-title">Peta lokasi</h2><p>Perkiraan lokasi publik · {publicLatitude.toFixed(3)}, {publicLongitude.toFixed(3)}</p></div>
+      <MapPin size={20} aria-hidden="true"/>
+    </div>
+    {failed ? <div className="report-map-fallback" role="status">
+      <p>Peta tidak dapat dimuat. Lokasi laporan tetap tersedia di atas.</p>
+      <a href={mapPageUrl} target="_blank" rel="noreferrer">Buka peta OpenStreetMap</a>
+    </div> : <iframe
+      className="report-map-frame"
+      title={`Peta lokasi publik ${publicLatitude.toFixed(3)}, ${publicLongitude.toFixed(3)}`}
+      src={mapUrl}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />}
+    <small className="report-map-attribution">© Kontributor OpenStreetMap</small>
+  </section>
 }
 
 export function Home() {
@@ -378,6 +460,9 @@ export function Detail() {
           <p className="condition-meta"><MapPin size={15} aria-hidden="true"/>{report.village}, {report.district}</p>
         </div>
       </section>
+      {typeof data.latitude === 'number' && Number.isFinite(data.latitude) && typeof data.longitude === 'number' && Number.isFinite(data.longitude)
+        ? <ReportLocationMap latitude={data.latitude} longitude={data.longitude}/>
+        : null}
       {isDuplicate ? <PrimaryReportCard report={report} primary={primary}/> : resolved ? (
         <section className="detail-block detail-bukti">
           <h2>Bukti penyelesaian</h2>
@@ -410,7 +495,7 @@ export function Statistics({ admin = false }: { admin?: boolean }) {
   const loadTrends = useCallback(() => getPublicTrends(), [])
   const loadAdminStats = useCallback(() => admin ? getAdminStats() : Promise.resolve(null), [admin])
   const { data: publicStats, error } = useAsync(loadPublicStats, [])
-  const { data: trends } = useAsync(loadTrends, [])
+  const { data: trends, error: trendsError, loading: trendsLoading, reload: reloadTrends } = useAsync(loadTrends, [])
   const { data: adminStats } = useAsync(loadAdminStats, [admin])
 
   const counts = (admin ? adminStats?.byStatus : publicStats?.byStatus) ?? emptyCounts
@@ -418,7 +503,6 @@ export function Statistics({ admin = false }: { admin?: boolean }) {
   const pct = (n: number) => total ? Math.round((n / total) * 100) : 0
   const byCategory = (publicStats?.byCategory ?? []).map((row) => [row.name, row.count] as [string, number]).sort((a, b) => b[1] - a[1])
   const categoryTotal = byCategory.reduce((sum, [, count]) => sum + count, 0)
-  const trendTotal = (trends?.byCategory ?? []).reduce((sum, row) => sum + row.months.reduce((monthSum, month) => monthSum + month.count, 0), 0)
   const bars: [string, number, string][] = [['Terverifikasi', counts.VERIFIED, 'verified'], ['Dalam tindak lanjut', counts.IN_PROGRESS, 'progress'], ['Selesai dicatat', counts.RESOLVED, 'resolved'], ['Laporan serupa', counts.DUPLICATE, 'duplicate']]
 
   return <AppShell mode={admin ? 'admin' : 'public'}><main className="page container">
@@ -441,13 +525,13 @@ export function Statistics({ admin = false }: { admin?: boolean }) {
       <section className="panel"><div className="panel-head"><div><h2>Status laporan</h2><p>Proporsi dari {admin ? 'seluruh' : 'laporan publik'}</p></div></div>
         {bars.map(([name, value, tone]) => <div className="bar-row" key={name}><div><span>{name}</span><b>{pct(value)}%</b></div><div className="bar-track"><i className={tone} style={{ width: `${pct(value)}%` }}/></div></div>)}
         <small className="chart-note">Persentase dihitung dari {admin ? 'seluruh laporan' : 'laporan yang tampil di halaman publik'}.</small>
-        <small className="chart-note">Tren 12 bulan terakhir: {trendTotal} laporan tercatat.</small>
       </section>
       <section className="panel"><div className="panel-head"><div><h2>Menurut kategori</h2><p>Kategori pada laporan publik</p></div></div>
         {byCategory.slice(0, 5).map(([name, value]) => <div className="category-row" key={name}><span className="category-dot"/><span>{name}</span><b>{categoryTotal ? Math.round((value / categoryTotal) * 100) : 0}%</b></div>)}
         {byCategory.length === 0 ? <p className="chart-note">Belum ada data kategori.</p> : null}
       </section>
     </div>
+    <TrendChart trends={trends} loading={trendsLoading} error={trendsError} onRetry={reloadTrends}/>
     </>}
     {adminStats ? <p className="chart-note">Data per {formatSubmitted(adminStats.asOf)}. </p> : null}
   </main></AppShell>
