@@ -6,4 +6,6 @@ test-uploads/
 .env.*
 !.env.example
 coverage/
+frontend/test-results/
+frontend/playwright-report/
 npm-debug.log*

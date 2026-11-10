@@ -86,15 +86,21 @@ test('tren kategori menampilkan agregat API dan label data demonstrasi', async (
 
 test('tren menampilkan state loading saat agregat sedang dimuat', async ({ page }) => {
   await page.route('**/api/stats/public', (route) => route.fulfill({ json: { data: publicStats } }))
+  let holdResponses = true
+  const pendingResponses: Array<() => void> = []
   await page.route('**/api/stats/trends', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    if (holdResponses) await new Promise<void>((resolve) => pendingResponses.push(resolve))
     await route.fulfill({
       json: { data: { period: '12 bulan', byCategory: [], asOf: '2026-02-01T00:00:00.000Z', label: 'Data demonstrasi' } },
     })
   })
   await page.goto('/statistik')
 
+  await expect.poll(() => pendingResponses.length).toBeGreaterThan(0)
   await expect(page.getByRole('status').getByText('Memuat tren laporan…')).toBeVisible()
+  holdResponses = false
+  pendingResponses.splice(0).forEach((release) => release())
+  await expect(page.getByText('Belum ada data tren untuk ditampilkan.')).toBeVisible()
 })
 
 test('tren API gagal menampilkan error dan dapat dicoba lagi', async ({ page }) => {
