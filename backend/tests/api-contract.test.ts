@@ -1852,6 +1852,9 @@ describe("report and privacy contract", () => {
         { status: "REJECTED", count: 1n },
         { status: "DUPLICATE", count: 1n }
       ])
+      .mockResolvedValueOnce([
+        { id: 1, name: "Jalan rusak", slug: "jalan-rusak", count: 5n }
+      ])
       .mockResolvedValueOnce([{ eligible: 3n, covered: 2n }])
       .mockResolvedValueOnce([{ resolved: 1n, withProof: 1n }]);
     mocks.prisma.reportStatusHistory.findMany.mockResolvedValue([{
@@ -1874,6 +1877,9 @@ describe("report and privacy contract", () => {
       resolvedWithProofRate: 100
     });
     expect(response.body.data.byStatus.DUPLICATE).toBe(1);
+    expect(response.body.data.byCategory).toEqual([
+      { id: 1, name: "Jalan rusak", slug: "jalan-rusak", count: 5 }
+    ]);
   });
 
   it.each([

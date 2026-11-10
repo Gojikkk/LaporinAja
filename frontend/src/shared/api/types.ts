@@ -96,6 +96,7 @@ export type AdminStatsDto = {
   total: number
   submissions: number
   byStatus: StatusCounts
+  byCategory: Array<{ id: number; name: string; slug: string; count: number }>
   statusDistribution: Record<Status, number>
   verificationRate: number
   followUpCoverage: number

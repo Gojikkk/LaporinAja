@@ -61,18 +61,23 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     setBusy(true)
     setError('')
     const form = new FormData(event.currentTarget)
-    const photo = form.get('photo')
-    if (!(photo instanceof File) || !photo.size) {
+    const photos = form.getAll('photos').filter((entry): entry is File => entry instanceof File && entry.size > 0)
+    if (photos.length < 1) {
       setError('Pilih minimal satu foto pendukung.')
       setBusy(false)
       return
     }
-    if (photo.size > 5242880) {
-      setError('Ukuran foto maksimal 5 MB.')
+    if (photos.length > 3) {
+      setError('Maksimal 3 foto pendukung.')
       setBusy(false)
       return
     }
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.type)) {
+    if (photos.some((photo) => photo.size > 5242880)) {
+      setError('Ukuran tiap foto maksimal 5 MB.')
+      setBusy(false)
+      return
+    }
+    if (photos.some((photo) => !['image/jpeg', 'image/png', 'image/webp'].includes(photo.type))) {
       setError('Gunakan foto JPG, PNG, atau WebP.')
       setBusy(false)
       return
@@ -93,7 +98,7 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
         village: String(form.get('village') ?? ''),
         locationDetail: String(form.get('locationDetail') ?? ''),
         submissionKey,
-        photos: [photo],
+        photos,
       })
       onToast(`Laporan ${result.code} berhasil dikirim.`)
       navigate('/dashboard')
@@ -122,7 +127,7 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     <TextField label="Kelurahan/desa" id="village" placeholder="Nama kelurahan atau desa"/>
     <TextField label="Patokan lokasi" id="locationDetail" placeholder="Contoh: depan taman lingkungan" hint="Hindari alamat rumah pribadi."/>
     <div className="form-section-title"><span>04</span><div><h2>Foto pendukung</h2><p>Unggah 1-3 foto, maksimal 5 MB per foto.</p></div></div>
-    <label className="upload-field" htmlFor="photo"><FilePlus2 size={22}/><b>Pilih foto dari perangkat</b><span>JPG, PNG, atau WebP · Maksimal 5 MB</span><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required/></label>
+    <label className="upload-field" htmlFor="photos"><FilePlus2 size={22}/><b>Pilih foto dari perangkat</b><span>1–3 foto JPG, PNG, atau WebP · Maksimal 5 MB per foto</span><input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required/></label>
     <div className="privacy-hint"><Info size={15}/> Hindari foto wajah, plat nomor, atau informasi pribadi.</div>
     <div className="auth-error" role="alert">{error}</div>
     <div className="form-actions"><Button to="/dashboard" variant="outline">Simpan nanti</Button><button className="button primary" type="submit" disabled={busy}>{busy ? 'Mengirim…' : 'Kirim laporan'} <ArrowRight size={16}/></button></div>

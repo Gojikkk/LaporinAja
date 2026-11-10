@@ -14,7 +14,7 @@ import { ApiError } from '../../shared/api/client'
 import {
   createCategory,
   getAdminCategories,
-  getPublicStats,
+  getAdminStats,
   updateCategory,
 } from '../../shared/api/endpoints'
 import type { AdminCategoryDto } from '../../shared/api/types'
@@ -70,7 +70,7 @@ function FormDialog({ title, intro, submitLabel, draft, error, busy, onChange, o
 export function AdminCategories() {
   useAdminTitle('Kategori Laporan')
   const loadCategories = useCallback(() => getAdminCategories(), [])
-  const loadStats = useCallback(() => getPublicStats(), [])
+  const loadStats = useCallback(() => getAdminStats(), [])
   const { data, error, loading, reload } = useAsync(loadCategories, [])
   const { data: stats } = useAsync(loadStats, [])
   const categories = data ?? []
