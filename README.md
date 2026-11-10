@@ -111,8 +111,9 @@ Quick Tunnel memberikan URL sementara yang berubah saat dimulai ulang. Preview p
 | Validasi request, CORS, CSRF, rate limit, dan session cookie | Tersedia |
 | Migrasi database dan data demo | Tersedia melalui Prisma |
 | Landing page, autentikasi, form laporan, dashboard pelapor/admin, dan statistik | UI tersedia |
-| Data daftar/detail laporan dan dashboard | Sebagian masih menggunakan data demo in-memory |
-| Integrasi frontend dengan API | Client dan beberapa form terhubung; integrasi semua halaman masih bertahap |
+| Data daftar/detail laporan dan dashboard | Dimuat langsung dari API backend |
+| Integrasi frontend dengan API | Semua halaman memakai endpoint backend, termasuk sesi cookie dan CSRF |
+| Login Google di frontend | Aktif bila `VITE_GOOGLE_CLIENT_ID` diisi; contoh tersedia di `frontend/.env.example` |
 | Build frontend dan tes kontrak API backend | Tersedia |
 
 ## Struktur repository
