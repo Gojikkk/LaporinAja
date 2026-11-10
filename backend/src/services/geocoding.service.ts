@@ -5,12 +5,22 @@ export type GeocodingCandidate = {
   latitude: number;
   longitude: number;
   displayName: string;
+  address?: {
+    city?: string;
+    district?: string;
+    village?: string;
+    locationDetail?: string;
+  };
 };
+
+type NominatimAddress = Record<string, unknown>;
 
 type NominatimResult = {
   lat?: unknown;
   lon?: unknown;
   display_name?: unknown;
+  name?: unknown;
+  address?: NominatimAddress;
 };
 
 const cacheTtlMs = 24 * 60 * 60 * 1000;
@@ -19,6 +29,26 @@ const minimumRequestIntervalMs = 1_100;
 const cache = new Map<string, { expiresAt: number; candidates: GeocodingCandidate[] }>();
 let requestQueue: Promise<void> = Promise.resolve();
 let lastRequestAt = 0;
+
+function firstAddressValue(address: NominatimAddress | undefined, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = address?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function mapAddress(address: NominatimAddress | undefined, name: unknown): GeocodingCandidate["address"] {
+  const mapped = {
+    city: firstAddressValue(address, "city", "town", "municipality", "county"),
+    district: firstAddressValue(address, "city_district", "district", "state_district"),
+    village: firstAddressValue(address, "village", "suburb", "quarter", "neighbourhood"),
+    locationDetail: typeof name === "string" && name.trim()
+      ? name.trim()
+      : firstAddressValue(address, "road", "pedestrian", "footway", "path", "park", "amenity", "leisure")
+  };
+  return Object.values(mapped).some(Boolean) ? mapped : undefined;
+}
 
 function readCache(key: string): GeocodingCandidate[] | undefined {
   const entry = cache.get(key);
@@ -46,7 +76,8 @@ async function queryNominatim(query: string): Promise<GeocodingCandidate[]> {
     q: query,
     format: "jsonv2",
     limit: "5",
-    countrycodes: "id"
+    countrycodes: "id",
+    addressdetails: "1"
   }).toString();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -77,7 +108,12 @@ async function queryNominatim(query: string): Promise<GeocodingCandidate[]> {
           typeof item.display_name !== "string") {
         return [];
       }
-      return [{ latitude, longitude, displayName: item.display_name }];
+      return [{
+        latitude,
+        longitude,
+        displayName: item.display_name,
+        address: mapAddress(item.address, item.name)
+      }];
     });
   } catch (error) {
     if (error instanceof HttpError) throw error;

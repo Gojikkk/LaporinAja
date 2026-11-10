@@ -365,7 +365,14 @@ describe("report location search", () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify([{
       lat: "-6.1752",
       lon: "106.8271",
-      display_name: "Taman Kota, Bandung, Jawa Barat, Indonesia"
+      display_name: "Taman Kota, Bandung, Jawa Barat, Indonesia",
+      name: "Taman Kota",
+      address: {
+        city: "Bandung",
+        city_district: "Coblong",
+        suburb: "Dago",
+        road: "Jalan Ir. H. Juanda"
+      }
     }]), {
       status: 200,
       headers: { "Content-Type": "application/json" }
@@ -388,12 +395,19 @@ describe("report location search", () => {
     expect(first.body.data).toEqual([{
       latitude: -6.1752,
       longitude: 106.8271,
-      displayName: "Taman Kota, Bandung, Jawa Barat, Indonesia"
+      displayName: "Taman Kota, Bandung, Jawa Barat, Indonesia",
+      address: {
+        city: "Bandung",
+        district: "Coblong",
+        village: "Dago",
+        locationDetail: "Taman Kota"
+      }
     }]);
     expect(second.body).toEqual(first.body);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0];
     expect(new URL(String(url)).searchParams.get("q")).toBe(query);
+    expect(new URL(String(url)).searchParams.get("addressdetails")).toBe("1");
     expect(options?.headers).toMatchObject({
       "User-Agent": expect.stringContaining("LaporinAja"),
       "Accept-Language": "id"

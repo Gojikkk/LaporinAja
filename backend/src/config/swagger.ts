@@ -81,6 +81,15 @@ const components = {
         latitude: { type: "number", example: -6.1752 },
         longitude: { type: "number", example: 106.8271 },
         displayName: { type: "string", example: "Taman Kota, Bandung, Jawa Barat, Indonesia" },
+        address: {
+          type: "object",
+          properties: {
+            city: { type: "string", example: "Bandung" },
+            district: { type: "string", example: "Coblong" },
+            village: { type: "string", example: "Dago" },
+            locationDetail: { type: "string", example: "Taman Kota" },
+          },
+        },
       },
       required: ["latitude", "longitude", "displayName"],
     },
