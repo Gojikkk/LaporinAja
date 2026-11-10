@@ -92,6 +92,23 @@ export type PublicTrendsDto = {
   label: string
 }
 
+export type GeocodingCandidateDto = {
+  latitude: number
+  longitude: number
+  displayName: string
+  address?: {
+    city?: string
+    district?: string
+    village?: string
+    locationDetail?: string
+  }
+}
+
+export type GeocodedAddressDto = {
+  displayName: string
+  address?: GeocodingCandidateDto['address']
+}
+
 export type AdminStatsDto = {
   total: number
   submissions: number

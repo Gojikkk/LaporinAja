@@ -495,6 +495,38 @@ function Gallery({ report }: { report: AdminReport }) {
   </section>
 }
 
+function AdminReportLocation({ latitude, longitude }: { latitude: number; longitude: number }) {
+  const [failed, setFailed] = useState(false)
+  const mapParams = new URLSearchParams({
+    bbox: `${longitude - 0.01},${latitude - 0.01},${longitude + 0.01},${latitude + 0.01}`,
+    layer: 'mapnik',
+    marker: `${latitude},${longitude}`,
+  })
+  const mapUrl = `https://www.openstreetmap.org/export/embed.html?${mapParams.toString()}`
+  const mapPageUrl = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`
+
+  return <section className="adm-card adm-location" aria-labelledby="adm-location-title">
+    <div className="adm-location-heading">
+      <div><h2 className="adm-card-title" id="adm-location-title">Peta lokasi laporan</h2><p>{latitude.toFixed(5)}, {longitude.toFixed(5)}</p></div>
+      <MapPin size={20} aria-hidden="true"/>
+    </div>
+    {failed ? <div className="adm-location-fallback" role="status">
+      <p>Peta tidak dapat dimuat. Alamat dan koordinat laporan tetap tersedia.</p>
+    </div> : <iframe
+      className="adm-location-frame"
+      title={`Peta lokasi laporan pada koordinat ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`}
+      src={mapUrl}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />}
+    <div className="adm-location-footer">
+      <small>© Kontributor OpenStreetMap</small>
+      <a href={mapPageUrl} target="_blank" rel="noreferrer">Buka peta OpenStreetMap</a>
+    </div>
+  </section>
+}
+
 export function AdminDetail() {
   useAdminTitle('Tinjau laporan')
   const { code = '' } = useParams()
@@ -554,6 +586,9 @@ export function AdminDetail() {
     <section className="adm-card" aria-labelledby="adm-internal"><p className="adm-eyebrow">INTERNAL · HANYA ADMIN</p><h2 className="adm-card-title" id="adm-internal">Pelapor: {report.reporter || 'Tidak tersedia'}</h2><p className="adm-card-note">Identitas pelapor tidak ditampilkan kepada publik.</p></section>
 
     <section className="adm-card" aria-labelledby="adm-detail-copy"><h2 className="adm-card-title" id="adm-detail-copy">Detail laporan</h2><p className="adm-prose">{report.description}</p><p className="adm-card-strong">{report.city} / {report.district} / {report.village}</p><p className="adm-card-note">Patokan: {report.landmark}</p></section>
+    {typeof report.latitude === 'number' && Number.isFinite(report.latitude) && typeof report.longitude === 'number' && Number.isFinite(report.longitude)
+      ? <AdminReportLocation latitude={report.latitude} longitude={report.longitude}/>
+      : null}
 
     <section className="adm-card" aria-labelledby="adm-history"><h2 className="adm-section-title" id="adm-history">Riwayat yang dapat ditelusuri</h2><p className="adm-card-caption">Urutan kronologis · catatan ditambahkan, tidak ditimpa</p><ol className="adm-timeline">{report.history.map((entry, index) => <li key={`${entry.at}-${index}`}><span className="adm-timeline-mark" aria-hidden="true"><span className="adm-timeline-dot">{index === 0 ? <Info size={14}/> : <CheckCircle2 size={14}/>}</span></span><div className="adm-timeline-body"><span className="adm-timeline-date">{entry.at}</span><p className="adm-timeline-title">{entry.title}</p>{entry.transition ? <p className="adm-timeline-transition">{entry.transition}</p> : null}<p className="adm-timeline-note">{entry.note}</p><span className="adm-timeline-actor">Administrator platform</span></div></li>)}</ol>{last ? <p className="adm-card-note">Catatan terakhir: {last.title}.</p> : null}</section>
 

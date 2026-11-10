@@ -24,6 +24,8 @@ export type AdminReport = {
   district: string
   village: string
   landmark: string
+  latitude: number | null
+  longitude: number | null
   status: Status
   /** Tanggal ISO agar urutan antrean tidak bergantung pada teks yang ditampilkan. */
   submittedAt: string
@@ -271,6 +273,8 @@ export function mapListReport(dto: PublicReportListItemDto): AdminReport {
     district: dto.district,
     village: dto.village,
     landmark: '',
+    latitude: dto.latitude,
+    longitude: dto.longitude,
     status: dto.status,
     submittedAt: dto.createdAt,
     reporter: '',
@@ -300,6 +304,8 @@ export function mapDetailReport(
     district: detail.district,
     village: detail.village,
     landmark: detail.locationDetail,
+    latitude: detail.latitude,
+    longitude: detail.longitude,
     status: detail.status,
     submittedAt: detail.createdAt,
     reporter: admin.reporterName ?? options.reporter ?? '',

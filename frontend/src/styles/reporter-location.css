@@ -1,0 +1,129 @@
+.report-coordinate-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfdfc;
+}
+
+.report-location-button {
+  justify-self: start;
+}
+
+.report-location-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.report-coordinate-fields {
+  margin: 0;
+}
+
+.report-location-results {
+  display: grid;
+  gap: 7px;
+}
+
+.report-location-results-label {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.report-location-result {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-location-result:hover {
+  border-color: var(--teal);
+  background: var(--paper);
+}
+
+.report-location-result svg {
+  color: var(--teal);
+}
+
+.report-location-result span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.report-location-result small {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.report-selected-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #e9f4f1;
+  color: var(--teal);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.report-selected-location svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.report-manual-coordinates {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.report-manual-coordinates summary {
+  width: fit-content;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.report-manual-coordinates .report-coordinate-fields {
+  margin-top: 12px;
+}
+
+.report-coordinate-fields input {
+  width: 100%;
+}
+
+.report-location-feedback {
+  margin: 0;
+  color: var(--teal);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.report-location-feedback-error {
+  color: #a33a32;
+}
+
+@media (max-width: 520px) {
+  .report-coordinate-panel {
+    padding: 13px;
+  }
+
+  .report-location-button {
+    width: 100%;
+  }
+}

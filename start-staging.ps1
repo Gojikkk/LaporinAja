@@ -231,7 +231,7 @@ try {
   $env:SESSION_COOKIE_SECURE = "true"
   $env:SESSION_COOKIE_SAME_SITE = "lax"
   Write-Host "Menyalakan API staging dan menjalankan migrasi..."
-  Invoke-Compose -ComposeArgs @("up", "-d", "api")
+  Invoke-Compose -ComposeArgs @("up", "-d", "--build", "api")
 
   $apiReady = $false
   for ($i = 0; $i -lt 90; $i++) {

@@ -8,6 +8,8 @@ import type {
   CreateReportInput,
   FollowUpDto,
   FollowUpInput,
+  GeocodingCandidateDto,
+  GeocodedAddressDto,
   NotificationDto,
   OwnerReportDetailDto,
   PublicReportDetailDto,
@@ -104,6 +106,14 @@ export function createReport(input: CreateReportInput) {
   body.append('submissionKey', input.submissionKey)
   for (const photo of input.photos) body.append('photos', photo)
   return apiData<{ code: string; status: Status }>('/reports', { method: 'POST', body })
+}
+
+export function searchReportLocations(query: string) {
+  return apiData<GeocodingCandidateDto[]>(`/location/search${queryString({ q: query })}`)
+}
+
+export function reverseLookupReportLocation(latitude: number, longitude: number) {
+  return apiData<GeocodedAddressDto>(`/location/reverse${queryString({ lat: latitude, lon: longitude })}`)
 }
 
 export type OwnerReportQuery = { status?: Status | ''; page?: number; limit?: number }
