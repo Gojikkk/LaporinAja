@@ -70,7 +70,7 @@ export function setSessionCookies(response: Response, token: string, csrf: strin
   response.cookie(CSRF_COOKIE, csrf, {
     httpOnly: false,
     secure: env.sessionCookieSecure,
-    sameSite: "lax",
+    sameSite: env.sessionCookieSameSite,
     path: "/",
     maxAge: sessionLifetimeMs
   });

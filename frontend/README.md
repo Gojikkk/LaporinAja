@@ -62,6 +62,49 @@ Tes E2E mencakup alur utama pelapor dan admin, statistik publik dan admin, serta
 
 ---
 
+## QA otomatis dengan Playwright
+
+Tes browser ini memeriksa beranda dan navigasi, pencarian/filter serta detail laporan publik, statistik, halaman sistem 403/404, login/registrasi, dan perlindungan rute. Dengan kredensial admin, suite juga memeriksa statistik admin dan ekspor CSV. Tes yang mengubah data (membuat akun/laporan, mengubah status, notifikasi, atau kategori) hanya berjalan jika diaktifkan secara eksplisit.
+
+### Persiapan
+
+1. Jalankan backend, database, dan frontend seperti petunjuk di [README utama](../README.md). Untuk preview Cloudflare, jalankan `Start-Staging.bat` dan biarkan terminalnya tetap hidup.
+2. Dari folder `frontend`, install dependency dan browser Chromium satu kali:
+
+   ```sh
+   npm install
+   npx playwright install chromium
+   ```
+
+3. Di terminal yang akan dipakai untuk tes, atur URL aplikasi yang sedang berjalan. Untuk lokal gunakan `http://127.0.0.1:5173`; untuk preview gunakan URL `https://...trycloudflare.com` yang ditampilkan launcher:
+
+   ```powershell
+   $env:PLAYWRIGHT_BASE_URL = "http://127.0.0.1:5173"
+   ```
+
+### Jalankan tes
+
+```sh
+npm run test:e2e
+```
+
+Tes dibuka di Chromium, dijalankan satu per satu, dan hasil HTML disimpan di `frontend/playwright-report/`. Buka laporan terakhir dengan `npm run test:e2e:report`. Untuk menjalankan browser test secara interaktif gunakan `npm run test:e2e:ui`.
+
+### Tes alur lengkap (mengubah data)
+
+Jalankan hanya pada database lokal/staging khusus QA—jangan pada production. Tes ini membuat akun, laporan beserta foto, meninjau dan menyelesaikan laporan dengan admin, serta menambahkan/mengubah/menonaktifkan kategori. Data hasil tes disimpan pada database.
+
+```powershell
+$env:PLAYWRIGHT_RUN_MUTATING = "1"
+$env:PLAYWRIGHT_ADMIN_EMAIL = "email-admin-staging"
+$env:PLAYWRIGHT_ADMIN_PASSWORD = "password-admin-staging"
+npm run test:e2e
+```
+
+Gunakan kredensial admin yang ditampilkan oleh `Start-Staging.bat` atau akun admin khusus QA. Password admin dari launcher juga disimpan di `%LOCALAPPDATA%\LaporinAja\staging-admin-password.txt`. Jangan masukkan password ke file konfigurasi atau commit. Tes pembuatan laporan memerlukan kategori aktif dan konfigurasi upload gambar backend yang berfungsi. Hilangkan `$env:PLAYWRIGHT_RUN_MUTATING` untuk kembali menjalankan tes aman tanpa perubahan data.
+
+---
+
 ## Progress Saat Ini
 
 Frontend menyediakan UI untuk halaman dan alur berikut:

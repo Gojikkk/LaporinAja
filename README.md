@@ -137,4 +137,4 @@ frontend/   Aplikasi React dan Vite
 compose.yaml
 ```
 
-Lihat [README backend](./backend/README.md) untuk detail environment, API, dan pengujian. Lihat [README frontend](./frontend/README.md) untuk struktur halaman dan integrasi frontend.
+Lihat [README backend](./backend/README.md) untuk detail environment, API, dan pengujian. Lihat [README frontend](./frontend/README.md) untuk struktur halaman, integrasi, dan tutorial QA otomatis Playwright.
