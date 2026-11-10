@@ -41,6 +41,19 @@ function Find-FreePort {
   throw "Tidak menemukan port kosong antara $First dan $Last."
 }
 
+function Get-EnvValue {
+  param([string]$Path, [string]$Name)
+  if (!(Test-Path $Path)) {
+    return ""
+  }
+  $pattern = "^\s*" + [regex]::Escape($Name) + "\s*="
+  $line = Get-Content $Path | Where-Object { $_ -match $pattern } | Select-Object -Last 1
+  if (!$line) {
+    return ""
+  }
+  return ($line -split "=", 2)[1].Trim().Trim('"').Trim("'")
+}
+
 function Find-Cloudflared {
   $command = Get-Command cloudflared -ErrorAction SilentlyContinue
   if ($command) {
@@ -161,6 +174,7 @@ try {
   $env:VITE_API_URL = "/api"
   $env:VITE_CSRF_COOKIE_NAME = "laporinaja_csrf"
   $env:VITE_CSRF_ENDPOINT = ""
+  $env:VITE_GOOGLE_CLIENT_ID = Get-EnvValue -Path $envFile -Name "GOOGLE_CLIENT_ID"
   $env:API_PROXY_TARGET = "http://127.0.0.1:$apiPort"
   $viteOut = "$logPrefix-vite.out"
   $viteErr = "$logPrefix-vite.err"

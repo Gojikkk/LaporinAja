@@ -49,6 +49,8 @@ services:
         value: /auth/csrf
       - key: VITE_CSRF_HEADER_NAME
         value: X-CSRF-Token
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
     routes:
       - type: rewrite
         source: /*
