@@ -286,7 +286,7 @@ export function Reports() {
         <span className="filter-label">Cari kode atau judul</span>
         <span className="search-field">
           <Search size={18} aria-hidden="true"/>
-          <input type="search" value={draft.q} onChange={(event) => updateDraft({ q: event.target.value })} placeholder="LA-2026-000123 atau jalan berlubang"/>
+          <input type="search" value={draft.q} onChange={(event) => updateDraft({ q: event.target.value })} placeholder="LPR-2026-000123 atau jalan berlubang"/>
         </span>
       </label>
       <div className="filter-field">
