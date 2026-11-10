@@ -1883,3 +1883,70 @@ html:has(.adm)::-webkit-scrollbar {
     padding: 20px;
   }
 }
+
+.adm-location-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  color: var(--adm-teal);
+}
+
+.adm-location-heading h2 {
+  margin: 0;
+  color: var(--adm-ink);
+}
+
+.adm-location-heading p {
+  margin: 5px 0 0;
+  color: var(--adm-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-location-frame {
+  display: block;
+  width: 100%;
+  height: 300px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--adm-canvas);
+}
+
+.adm-location-fallback {
+  display: grid;
+  min-height: 120px;
+  place-content: center;
+  border-radius: 9px;
+  background: var(--adm-canvas);
+  color: var(--adm-muted);
+  text-align: center;
+}
+
+.adm-location-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.adm-location-footer small {
+  color: var(--adm-muted);
+  font-size: 10px;
+}
+
+.adm-location-footer a {
+  color: var(--adm-teal);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .adm-location-frame {
+    height: 240px;
+  }
+}

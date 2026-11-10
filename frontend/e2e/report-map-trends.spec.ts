@@ -64,6 +64,29 @@ test('lokasi tetap terbaca jika peta OpenStreetMap tidak dapat diakses', async (
   await expect(page.getByRole('heading', { name: 'Peta lokasi' })).toBeVisible()
 })
 
+test('admin dapat melihat peta lokasi laporan dan membuka OpenStreetMap', async ({ page }) => {
+  await page.route('**/api/auth/me', (route) => route.fulfill({
+    json: { data: { id: 'admin-1', name: 'Admin QA', role: 'ADMIN' } },
+  }))
+  await page.route('**/api/admin/reports/QA-MAP-001', (route) => route.fulfill({
+    json: { data: { ...publicReport, reporterName: 'Pelapor QA', isHidden: false } },
+  }))
+  await page.route('**/api/admin/reports?**', (route) => route.fulfill({
+    json: { data: [], meta: { page: 1, limit: 50, total: 0 } },
+  }))
+  await page.route('https://www.openstreetmap.org/**', (route) => route.fulfill({ contentType: 'text/html', body: '<html></html>' }))
+  await page.goto('/admin/laporan/QA-MAP-001')
+
+  const map = page.locator('.adm-location-frame')
+  await expect(map).toBeVisible()
+  const mapUrl = new URL((await map.getAttribute('src'))!)
+  expect(mapUrl.searchParams.get('marker')).toBe('-6.1752,106.8271')
+  const openMap = page.getByRole('link', { name: 'Buka peta OpenStreetMap' })
+  await expect(openMap).toHaveAttribute('href', /mlat=-6\.1752&mlon=106\.8271/)
+  await expect(openMap).toHaveAttribute('target', '_blank')
+  await expect(page.getByText('Bandung / Sukasari / Cipedes', { exact: true })).toBeVisible()
+})
+
 test('tren kategori menampilkan agregat API dan label data demonstrasi', async ({ page }) => {
   await page.route('**/api/stats/public', (route) => route.fulfill({ json: { data: publicStats } }))
   await page.route('**/api/stats/trends', (route) => route.fulfill({
