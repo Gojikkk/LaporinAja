@@ -331,6 +331,76 @@ describe("API contract transport and authentication", () => {
   });
 });
 
+describe("report location search", () => {
+  it("requires a reporter session", async () => {
+    const response = await request(app)
+      .get("/api/location/search?q=Bandung")
+      .set("Origin", frontend);
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("does not allow admin sessions to search reporter locations", async () => {
+    const response = await request(app)
+      .get("/api/location/search?q=Bandung")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie("ADMIN"));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("validates location search query length", async () => {
+    const response = await request(app)
+      .get("/api/location/search?q=ab")
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie());
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("BAD_REQUEST");
+  });
+
+  it("searches Indonesia locations and caches user-triggered provider results", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify([{
+      lat: "-6.1752",
+      lon: "106.8271",
+      display_name: "Taman Kota, Bandung, Jawa Barat, Indonesia"
+    }]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const query = "Dekat taman, Kelurahan QA, Kecamatan QA, Kota QA, Indonesia";
+
+    const first = await request(app)
+      .get("/api/location/search")
+      .query({ q: query })
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie());
+    const second = await request(app)
+      .get("/api/location/search")
+      .query({ q: query })
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie());
+
+    expect(first.status).toBe(200);
+    expect(first.body.data).toEqual([{
+      latitude: -6.1752,
+      longitude: 106.8271,
+      displayName: "Taman Kota, Bandung, Jawa Barat, Indonesia"
+    }]);
+    expect(second.body).toEqual(first.body);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).searchParams.get("q")).toBe(query);
+    expect(options?.headers).toMatchObject({
+      "User-Agent": expect.stringContaining("LaporinAja"),
+      "Accept-Language": "id"
+    });
+  });
+});
+
 describe("report and privacy contract", () => {
   it("returns the same 404 for an unknown or non-owned report code", async () => {
     mocks.prisma.report.findFirst.mockResolvedValue(null);
