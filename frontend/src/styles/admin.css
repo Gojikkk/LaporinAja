@@ -1533,6 +1533,10 @@ html:has(.adm)::-webkit-scrollbar {
   color: #6ee7b7;
 }
 
+.adm-toast-error svg {
+  color: #ffb4a9;
+}
+
 /* ------------------------------------------------ detail interaksi & gerak */
 
 /* Angka rata kolom agar kode, tanggal, dan hitungan tidak "bergetar". */

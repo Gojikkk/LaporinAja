@@ -161,6 +161,7 @@ export function AdminQueue() {
   const [draftCategory, setDraftCategory] = useState(categoryFilter)
   const [exporting, setExporting] = useState(false)
   const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
 
   const loadCategories = useCallback(() => getAdminCategories(), [])
   const { data: categories } = useAsync(loadCategories, [])
@@ -216,10 +217,13 @@ export function AdminQueue() {
 
   async function handleExport() {
     setExporting(true)
+    setToast('')
     try {
       await exportAdminReports({ status: statusFilter === 'ALL' ? '' : statusFilter, category: categoryFilter === 'ALL' ? '' : categoryFilter })
+      setToastError(false)
       setToast('Ekspor CSV berhasil diunduh.')
     } catch (reason) {
+      setToastError(true)
       setToast(errorMessage(reason))
     } finally {
       setExporting(false)
@@ -267,7 +271,7 @@ export function AdminQueue() {
         <Link className="adm-btn adm-btn-outline" to="/admin">Lihat semua laporan</Link>
       </>}
     </section>
-    {toast ? <div className="adm-toast" role="status" aria-live="polite"><CheckCircle2 size={18} aria-hidden="true"/><span>{toast}</span></div> : null}
+    {toast ? <div className={`adm-toast${toastError ? ' adm-toast-error' : ''}`} role={toastError ? 'alert' : 'status'} aria-live={toastError ? 'assertive' : 'polite'}>{toastError ? <CircleAlert size={18} aria-hidden="true"/> : <CheckCircle2 size={18} aria-hidden="true"/>}<span>{toast}</span></div> : null}
   </AdminShell>
 }
 
