@@ -413,6 +413,68 @@ describe("report location search", () => {
       "Accept-Language": "id"
     });
   });
+
+  it("reverse geocodes device coordinates for the authenticated reporter", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      display_name: "Taman Kota, Dago, Bandung, Indonesia",
+      name: "Taman Kota",
+      address: {
+        city: "Bandung",
+        city_district: "Coblong",
+        suburb: "Dago",
+        park: "Taman Kota"
+      }
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await request(app)
+      .get("/api/location/reverse")
+      .query({ lat: "-6.1752", lon: "106.8271" })
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({
+      displayName: "Taman Kota, Dago, Bandung, Indonesia",
+      address: {
+        city: "Bandung",
+        district: "Coblong",
+        village: "Dago",
+        locationDetail: "Taman Kota"
+      }
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/reverse");
+    expect(new URL(String(url)).searchParams.get("lat")).toBe("-6.1752");
+    expect(new URL(String(url)).searchParams.get("lon")).toBe("106.8271");
+    expect(new URL(String(url)).searchParams.get("addressdetails")).toBe("1");
+    expect(options?.headers).toMatchObject({
+      "User-Agent": expect.stringContaining("LaporinAja"),
+      "Accept-Language": "id"
+    });
+  });
+
+  it("rejects invalid reverse-geocoding coordinates and non-reporter accounts", async () => {
+    const invalid = await request(app)
+      .get("/api/location/reverse")
+      .query({ lat: "91", lon: "106.8271" })
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie());
+    const admin = await request(app)
+      .get("/api/location/reverse")
+      .query({ lat: "-6.1752", lon: "106.8271" })
+      .set("Origin", frontend)
+      .set("Cookie", sessionCookie("ADMIN"));
+
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe("BAD_REQUEST");
+    expect(admin.status).toBe(403);
+    expect(admin.body.error.code).toBe("FORBIDDEN");
+  });
 });
 
 describe("report and privacy contract", () => {

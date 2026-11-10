@@ -11,4 +11,11 @@ geocodingRoutes.get(
   geocodingController.search
 );
 
+geocodingRoutes.get(
+  "/location/reverse",
+  requireAuth,
+  requireRole("PELAPOR"),
+  geocodingController.reverse
+);
+
 export default geocodingRoutes;
