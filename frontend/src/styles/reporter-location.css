@@ -1,0 +1,48 @@
+.report-coordinate-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfdfc;
+}
+
+.report-location-button {
+  justify-self: start;
+}
+
+.report-location-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.report-coordinate-fields {
+  margin: 0;
+}
+
+.report-coordinate-fields input {
+  width: 100%;
+}
+
+.report-location-feedback {
+  margin: 0;
+  color: var(--teal);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.report-location-feedback-error {
+  color: #a33a32;
+}
+
+@media (max-width: 520px) {
+  .report-coordinate-panel {
+    padding: 13px;
+  }
+
+  .report-location-button {
+    width: 100%;
+  }
+}

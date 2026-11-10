@@ -1,12 +1,13 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileCheck2, FilePlus2, Info, MapPin, MessageSquareText, Search, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileCheck2, FilePlus2, Info, LocateFixed, MapPin, MessageSquareText, Search, SlidersHorizontal } from 'lucide-react'
 import { AppShell, Button, CategoryIcon, PageIntro, PrimaryReportCard, StatCard, StatusBadge, Timeline, TextField } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
 import { createReport, getCategories, getMyReport, getMyReports, getPublicReport } from '../../shared/api/endpoints'
 import { useSession } from '../../shared/session'
 import { useAsync } from '../../shared/useAsync'
 import { countByStatus, latestNote, mapDetailReport, mapListReport, toCard } from '../../shared/report-store'
+import '../../styles/reporter-location.css'
 
 function Loading({ label }: { label: string }) {
   return <AppShell mode="reporter"><main className="page container"><div className="empty-state"><Clock3 size={25}/><h2>{label}</h2><p>Menghubungkan ke layanan LaporinAja.</p></div></main></AppShell>
@@ -52,15 +53,63 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
+  const [locationBusy, setLocationBusy] = useState(false)
+  const [locationMessage, setLocationMessage] = useState('')
+  const [locationError, setLocationError] = useState('')
   const [submissionKey] = useState(() => crypto.randomUUID())
   const loadCategories = useCallback(() => getCategories(), [])
   const { data: categories, error: categoryError, loading: categoryLoading } = useAsync(loadCategories, [])
+
+  function useDeviceLocation() {
+    setLocationMessage('')
+    setLocationError('')
+    if (!navigator.geolocation) {
+      setLocationError('Browser ini tidak mendukung akses lokasi. Kamu tetap dapat mengisi koordinat secara manual.')
+      return
+    }
+
+    setLocationBusy(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(String(position.coords.latitude))
+        setLongitude(String(position.coords.longitude))
+        setLocationMessage('Lokasi berhasil diambil. Periksa kembali titiknya sebelum mengirim.')
+        setLocationBusy(false)
+      },
+      (reason) => {
+        setLocationError(reason.code === reason.PERMISSION_DENIED
+          ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini atau isi koordinat secara manual.'
+          : reason.code === reason.TIMEOUT
+            ? 'Pengambilan lokasi terlalu lama. Coba lagi atau isi koordinat secara manual.'
+            : 'Lokasi perangkat tidak tersedia. Coba lagi atau isi koordinat secara manual.')
+        setLocationBusy(false)
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    )
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setBusy(true)
     setError('')
     const form = new FormData(event.currentTarget)
+    const latitudeValue = String(form.get('latitude') ?? '').trim()
+    const longitudeValue = String(form.get('longitude') ?? '').trim()
+    if ((latitudeValue.length === 0) !== (longitudeValue.length === 0)) {
+      setError('Latitude dan longitude harus diisi bersama.')
+      setBusy(false)
+      return
+    }
+    const parsedLatitude = latitudeValue ? Number(latitudeValue) : undefined
+    const parsedLongitude = longitudeValue ? Number(longitudeValue) : undefined
+    if ((parsedLatitude !== undefined && (!Number.isFinite(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90))
+      || (parsedLongitude !== undefined && (!Number.isFinite(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180))) {
+      setError('Koordinat tidak valid. Latitude harus antara -90 dan 90, longitude antara -180 dan 180.')
+      setBusy(false)
+      return
+    }
     const photos = form.getAll('photos').filter((entry): entry is File => entry instanceof File && entry.size > 0)
     if (photos.length < 1) {
       setError('Pilih minimal satu foto pendukung.')
@@ -97,6 +146,8 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
         district: String(form.get('district') ?? ''),
         village: String(form.get('village') ?? ''),
         locationDetail: String(form.get('locationDetail') ?? ''),
+        latitude: parsedLatitude,
+        longitude: parsedLongitude,
         submissionKey,
         photos,
       })
@@ -126,7 +177,21 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     <div className="form-two"><TextField label="Kota/kabupaten" id="city" placeholder="Contoh: Bandung"/><TextField label="Kecamatan" id="district" placeholder="Nama kecamatan"/></div>
     <TextField label="Kelurahan/desa" id="village" placeholder="Nama kelurahan atau desa"/>
     <TextField label="Patokan lokasi" id="locationDetail" placeholder="Contoh: depan taman lingkungan" hint="Hindari alamat rumah pribadi."/>
-    <div className="form-section-title"><span>04</span><div><h2>Foto pendukung</h2><p>Unggah 1-3 foto, maksimal 5 MB per foto.</p></div></div>
+    <div className="form-section-title"><span>04</span><div><h2>Titik lokasi (opsional)</h2><p>Gunakan lokasi perangkat atau isi koordinat manual agar laporan dapat ditampilkan di peta.</p></div></div>
+    <div className="report-coordinate-panel">
+      <button type="button" className="button outline report-location-button" onClick={useDeviceLocation} disabled={locationBusy || busy}>
+        <LocateFixed size={17} aria-hidden="true"/>{locationBusy ? 'Mengambil lokasi…' : 'Gunakan lokasi saya'}
+      </button>
+      <p className="report-location-hint">Browser akan meminta izin lokasi. Kamu juga bisa memasukkan koordinat dari peta secara manual. Titik publik ditampilkan dengan pembulatan 3 desimal.</p>
+      <div className="form-two report-coordinate-fields">
+        <div className="form-field"><label htmlFor="latitude">Latitude</label><input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="Contoh: -6.1752" aria-describedby="coordinate-range-hint"/></div>
+        <div className="form-field"><label htmlFor="longitude">Longitude</label><input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="Contoh: 106.8271" aria-describedby="coordinate-range-hint"/></div>
+      </div>
+      <small id="coordinate-range-hint" className="report-location-hint">Isi keduanya atau biarkan kosong. Latitude: -90 sampai 90; longitude: -180 sampai 180.</small>
+      {locationMessage ? <p className="report-location-feedback" role="status">{locationMessage}</p> : null}
+      {locationError ? <p className="report-location-feedback report-location-feedback-error" role="alert">{locationError}</p> : null}
+    </div>
+    <div className="form-section-title"><span>05</span><div><h2>Foto pendukung</h2><p>Unggah 1-3 foto, maksimal 5 MB per foto.</p></div></div>
     <label className="upload-field" htmlFor="photos"><FilePlus2 size={22}/><b>Pilih foto dari perangkat</b><span>1–3 foto JPG, PNG, atau WebP · Maksimal 5 MB per foto</span><input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required/></label>
     <div className="privacy-hint"><Info size={15}/> Hindari foto wajah, plat nomor, atau informasi pribadi.</div>
     <div className="auth-error" role="alert">{error}</div>
