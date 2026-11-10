@@ -138,6 +138,7 @@ export async function getAdminStats() {
   const [
     total,
     grouped,
+    categoryCounts,
     followUpCoverage,
     resolvedEvidence,
     verifiedHistories,
@@ -147,6 +148,15 @@ export async function getAdminStats() {
       SELECT status::text AS status, COUNT(*)::bigint AS count
       FROM reports
       GROUP BY status
+    `,
+    prisma.$queryRaw<
+      Array<{ id: number; name: string; slug: string; count: bigint }>
+    >`
+      SELECT c.id, c.name, c.slug, COUNT(r.id)::bigint AS count
+      FROM report_categories c
+      LEFT JOIN reports r ON r.category_id = c.id
+      GROUP BY c.id, c.name, c.slug
+      ORDER BY c.id
     `,
     prisma.$queryRaw<Array<{ eligible: bigint; covered: bigint }>>`
       SELECT
@@ -199,6 +209,12 @@ export async function getAdminStats() {
     total,
     submissions: total,
     byStatus,
+    byCategory: categoryCounts.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      count: Number(row.count),
+    })),
     statusDistribution: percentagesByStatus(byStatus, total),
     verificationRate: percentage(verifiedCount, total),
     followUpCoverage: percentage(followUpCovered, followUpEligible),
