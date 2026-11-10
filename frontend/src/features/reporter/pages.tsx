@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileCheck2, FilePlus2, Info, LocateFixed, MapPin, MessageSquareText, Search, SlidersHorizontal } from 'lucide-react'
 import { AppShell, Button, CategoryIcon, PageIntro, PrimaryReportCard, StatCard, StatusBadge, Timeline, TextField } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
-import { createReport, getCategories, getMyReport, getMyReports, getPublicReport, searchReportLocations } from '../../shared/api/endpoints'
+import { createReport, getCategories, getMyReport, getMyReports, getPublicReport, reverseLookupReportLocation, searchReportLocations } from '../../shared/api/endpoints'
 import type { GeocodingCandidateDto } from '../../shared/api/types'
 import { useSession } from '../../shared/session'
 import { useAsync } from '../../shared/useAsync'
@@ -158,14 +158,54 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     }
 
     setLocationBusy(true)
+    setLocationResults([])
+    setSelectedLocation(null)
+    clearAutoFilledLocationFields()
+    setLatitude('')
+    setLongitude('')
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(String(position.coords.latitude))
-        setLongitude(String(position.coords.longitude))
-        setSelectedLocation(null)
-        setLocationResults([])
-        setLocationMessage('Lokasi berhasil diambil. Periksa kembali titiknya sebelum mengirim.')
-        setLocationBusy(false)
+      async (position) => {
+        const { latitude: currentLatitude, longitude: currentLongitude } = position.coords
+        setLatitude(String(currentLatitude))
+        setLongitude(String(currentLongitude))
+        try {
+          const result = await reverseLookupReportLocation(currentLatitude, currentLongitude)
+          const fillField = (name: string, value: string | undefined) => {
+            const field = formRef.current?.elements.namedItem(name)
+            if (!(field instanceof HTMLInputElement) || !value) return
+            const previousAutoFill = autoFilledLocationFields.current[name]
+            if (!field.value.trim() || field.value === previousAutoFill) {
+              field.value = value
+              autoFilledLocationFields.current[name] = value
+            }
+          }
+          fillField('city', result.address?.city)
+          fillField('district', result.address?.district)
+          fillField('village', result.address?.village)
+          fillField('locationDetail', result.address?.locationDetail)
+          const locationFields = [
+            ['city', 'kota/kabupaten'],
+            ['district', 'kecamatan'],
+            ['village', 'kelurahan/desa'],
+            ['locationDetail', 'patokan lokasi'],
+          ] as const
+          const missing = locationFields
+            .filter(([name]) => {
+              const field = formRef.current?.elements.namedItem(name)
+              return !(field instanceof HTMLInputElement) || !field.value.trim()
+            })
+            .map(([, label]) => label)
+          setLocationMessage(missing.length
+            ? `Titik GPS berhasil diambil. Lengkapi ${missing.join(', ')} jika belum terisi.`
+            : 'Titik dan wilayah berhasil diambil. Pastikan lokasinya sesuai sebelum mengirim.')
+        } catch (reason) {
+          setLocationMessage('Titik GPS berhasil diambil, tetapi wilayah tidak berhasil ditemukan. Lengkapi wilayah secara manual.')
+          setLocationError(reason instanceof ApiError
+            ? reason.message
+            : 'Pencarian alamat dari lokasi perangkat gagal.')
+        } finally {
+          setLocationBusy(false)
+        }
       },
       (reason) => {
         setLocationError(reason.code === reason.PERMISSION_DENIED

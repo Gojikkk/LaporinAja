@@ -53,6 +53,41 @@ test('pelapor dapat mengambil lokasi perangkat dan mengirim koordinat ke API', a
   expect(submittedBody).toContain('name="longitude"\r\n\r\n106.8271')
 })
 
+test('gunakan lokasi saya mengisi wilayah dari reverse geocoding', async ({ page }) => {
+  await page.context().grantPermissions(['geolocation'])
+  await page.context().setGeolocation({ latitude: -6.1752, longitude: 106.8271 })
+  await openReportForm(page, false)
+  let lookupUrl: URL | undefined
+  await page.route('**/api/location/reverse**', (route) => {
+    lookupUrl = new URL(route.request().url())
+    return route.fulfill({
+      json: {
+        data: {
+          displayName: 'Taman Kota, Bandung, Indonesia',
+          address: {
+            city: 'Bandung',
+            district: 'Coblong',
+            village: 'Dago',
+            locationDetail: 'Taman Kota',
+          },
+        },
+      },
+    })
+  })
+
+  await page.getByRole('button', { name: 'Gunakan lokasi saya' }).click()
+  await expect(page.getByLabel('Kota/kabupaten')).toHaveValue('Bandung')
+  await expect(page.getByLabel('Kecamatan')).toHaveValue('Coblong')
+  await expect(page.getByLabel('Kelurahan/desa')).toHaveValue('Dago')
+  await expect(page.getByLabel('Patokan lokasi')).toHaveValue('Taman Kota')
+  expect(lookupUrl?.searchParams.get('lat')).toBe('-6.1752')
+  expect(lookupUrl?.searchParams.get('lon')).toBe('106.8271')
+
+  await openManualCoordinates(page)
+  await expect(page.getByLabel('Latitude')).toHaveValue('-6.1752')
+  await expect(page.getByLabel('Longitude')).toHaveValue('106.8271')
+})
+
 test('koordinat manual memerlukan latitude dan longitude berpasangan', async ({ page }) => {
   await openReportForm(page)
   await openManualCoordinates(page)

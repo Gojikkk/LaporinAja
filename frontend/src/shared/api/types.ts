@@ -104,6 +104,11 @@ export type GeocodingCandidateDto = {
   }
 }
 
+export type GeocodedAddressDto = {
+  displayName: string
+  address?: GeocodingCandidateDto['address']
+}
+
 export type AdminStatsDto = {
   total: number
   submissions: number
