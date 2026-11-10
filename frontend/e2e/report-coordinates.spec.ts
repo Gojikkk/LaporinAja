@@ -9,7 +9,7 @@ const photo = {
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=', 'base64'),
 }
 
-async function openReportForm(page: import('@playwright/test').Page) {
+async function openReportForm(page: import('@playwright/test').Page, fillLocationFields = true) {
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: reporterSession }))
   await page.route('**/api/auth/csrf', (route) => route.fulfill({ json: { data: { csrfToken: 'qa-csrf-token' } } }))
   await page.route('**/api/categories', (route) => route.fulfill({ json: categories }))
@@ -18,10 +18,12 @@ async function openReportForm(page: import('@playwright/test').Page) {
   await page.getByLabel('Kategori').selectOption('1')
   await page.getByLabel('Judul laporan').fill('Jalan berlubang di dekat taman')
   await page.getByLabel('Deskripsi').fill('Jalan berlubang cukup dalam dan mengganggu kendaraan yang melintas setiap hari.')
-  await page.getByLabel('Kota/kabupaten').fill('Kota QA')
-  await page.getByLabel('Kecamatan').fill('Kecamatan QA')
-  await page.getByLabel('Kelurahan/desa').fill('Kelurahan QA')
-  await page.getByLabel('Patokan lokasi').fill('Dekat taman kota')
+  if (fillLocationFields) {
+    await page.getByLabel('Kota/kabupaten').fill('Kota QA')
+    await page.getByLabel('Kecamatan').fill('Kecamatan QA')
+    await page.getByLabel('Kelurahan/desa').fill('Kelurahan QA')
+    await page.getByLabel('Patokan lokasi').fill('Dekat taman kota')
+  }
   await page.getByLabel('Pilih foto dari perangkat').setInputFiles(photo)
 }
 
@@ -135,6 +137,46 @@ test('pelapor mencari lokasi teks lalu memilih titik yang benar', async ({ page 
   await expect(page).toHaveURL(/\/dashboard$/)
   expect(submittedBody).toContain('name="latitude"\r\n\r\n-6.1752')
   expect(submittedBody).toContain('name="longitude"\r\n\r\n106.8271')
+})
+
+test('memilih lokasi mengisi wilayah otomatis tanpa input wilayah sebelumnya', async ({ page }) => {
+  await openReportForm(page, false)
+  await page.getByLabel('Cari tempat atau alamat umum').fill('Taman Kota Bandung')
+  let submittedBody = ''
+  await page.route('**/api/location/search**', (route) => route.fulfill({
+    json: {
+      data: [{
+        latitude: -6.1752,
+        longitude: 106.8271,
+        displayName: 'Taman Kota, Bandung, Indonesia',
+        address: {
+          city: 'Bandung',
+          district: 'Coblong',
+          village: 'Dago',
+          locationDetail: 'Taman Kota',
+        },
+      }],
+    },
+  }))
+  await page.getByRole('button', { name: 'Cari titik dari lokasi' }).click()
+  await page.getByRole('button', { name: /Taman Kota, Bandung, Indonesia/ }).click()
+
+  await expect(page.getByLabel('Kota/kabupaten')).toHaveValue('Bandung')
+  await expect(page.getByLabel('Kecamatan')).toHaveValue('Coblong')
+  await expect(page.getByLabel('Kelurahan/desa')).toHaveValue('Dago')
+  await expect(page.getByLabel('Patokan lokasi')).toHaveValue('Taman Kota')
+
+  await page.route('**/api/reports', async (route) => {
+    submittedBody = route.request().postData() ?? ''
+    await route.fulfill({ json: { data: { code: 'LPR-2026-000006', status: 'SUBMITTED' } }, status: 201 })
+  })
+  await page.getByRole('button', { name: 'Kirim laporan' }).click()
+
+  await expect(page).toHaveURL(/\/dashboard$/)
+  expect(submittedBody).toContain('name="city"\r\n\r\nBandung')
+  expect(submittedBody).toContain('name="district"\r\n\r\nCoblong')
+  expect(submittedBody).toContain('name="village"\r\n\r\nDago')
+  expect(submittedBody).toContain('name="locationDetail"\r\n\r\nTaman Kota')
 })
 
 test('mengubah patokan lokasi menghapus titik hasil pencarian yang lama', async ({ page }) => {

@@ -96,6 +96,12 @@ export type GeocodingCandidateDto = {
   latitude: number
   longitude: number
   displayName: string
+  address?: {
+    city?: string
+    district?: string
+    village?: string
+    locationDetail?: string
+  }
 }
 
 export type AdminStatsDto = {

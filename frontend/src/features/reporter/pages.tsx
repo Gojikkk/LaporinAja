@@ -53,6 +53,7 @@ export function Dashboard() {
 export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
   const navigate = useNavigate()
   const formRef = useRef<HTMLFormElement>(null)
+  const autoFilledLocationFields = useRef<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [latitude, setLatitude] = useState('')
@@ -66,18 +67,24 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
   const loadCategories = useCallback(() => getCategories(), [])
   const { data: categories, error: categoryError, loading: categoryLoading } = useAsync(loadCategories, [])
 
+  function clearAutoFilledLocationFields() {
+    for (const [name, previousValue] of Object.entries(autoFilledLocationFields.current)) {
+      const field = formRef.current?.elements.namedItem(name)
+      if (field instanceof HTMLInputElement && field.value === previousValue) field.value = ''
+    }
+    autoFilledLocationFields.current = {}
+  }
+
   async function searchLocationFromAddress() {
     const form = formRef.current
     const getField = (name: string) => {
       const field = form?.elements.namedItem(name)
       return field instanceof HTMLInputElement ? field.value.trim() : ''
     }
-    const locationParts = [
-      getField('locationDetail'),
-      getField('village'),
-      getField('district'),
-      getField('city'),
-    ].filter(Boolean)
+    const searchText = getField('locationSearchQuery')
+    const locationParts = searchText
+      ? [searchText]
+      : [getField('locationDetail'), getField('village'), getField('district'), getField('city')].filter(Boolean)
     if (locationParts.length === 0) {
       setLocationError('Isi patokan atau wilayah lokasi terlebih dahulu.')
       return
@@ -89,6 +96,7 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     setLocationMessage('')
     setLocationResults([])
     setSelectedLocation(null)
+    clearAutoFilledLocationFields()
     setLatitude('')
     setLongitude('')
     try {
@@ -106,7 +114,12 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
 
   function handleLocationInput(event: InputEvent<HTMLFormElement>) {
     const target = event.target
-    if (!(target instanceof HTMLInputElement) || !['city', 'district', 'village', 'locationDetail'].includes(target.name)) return
+    if (!(target instanceof HTMLInputElement) || !['city', 'district', 'village', 'locationDetail', 'locationSearchQuery'].includes(target.name)) return
+    if (target.name === 'locationSearchQuery' && selectedLocation) {
+      clearAutoFilledLocationFields()
+    } else {
+      delete autoFilledLocationFields.current[target.name]
+    }
     setLocationResults([])
     setSelectedLocation(null)
     setLatitude('')
@@ -116,6 +129,18 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
   }
 
   function selectLocation(location: GeocodingCandidateDto) {
+    const form = formRef.current
+    const fillField = (name: string, value: string | undefined) => {
+      const field = form?.elements.namedItem(name)
+      if (field instanceof HTMLInputElement && value) {
+        field.value = value
+        autoFilledLocationFields.current[name] = value
+      }
+    }
+    fillField('city', location.address?.city)
+    fillField('district', location.address?.district)
+    fillField('village', location.address?.village)
+    fillField('locationDetail', location.address?.locationDetail)
     setSelectedLocation(location)
     setLatitude(String(location.latitude))
     setLongitude(String(location.longitude))
@@ -171,6 +196,20 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     if ((parsedLatitude !== undefined && (!Number.isFinite(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90))
       || (parsedLongitude !== undefined && (!Number.isFinite(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180))) {
       setError('Koordinat tidak valid. Latitude harus antara -90 dan 90, longitude antara -180 dan 180.')
+      setBusy(false)
+      return
+    }
+    const requiredLocationFields = [
+      ['city', 'Kota/kabupaten'],
+      ['district', 'Kecamatan'],
+      ['village', 'Kelurahan/desa'],
+      ['locationDetail', 'Patokan lokasi'],
+    ] as const
+    const missingLocationFields = requiredLocationFields
+      .filter(([name]) => !String(form.get(name) ?? '').trim())
+      .map(([, label]) => label)
+    if (missingLocationFields.length > 0) {
+      setError(`Wilayah belum lengkap. Pilih hasil lokasi yang mengisi wilayah otomatis atau lengkapi: ${missingLocationFields.join(', ')}.`)
       setBusy(false)
       return
     }
@@ -238,10 +277,11 @@ export function CreateReport({ onToast }: { onToast: (s: string) => void }) {
     <TextField label="Judul laporan" id="title" placeholder="Contoh: Lampu jalan padam dekat taman" hint="10-100 karakter"/>
     <div className="form-field"><label htmlFor="description">Deskripsi *</label><textarea id="description" name="description" required minLength={30} maxLength={1000} rows={5} placeholder="Ceritakan kondisi dan kapan kamu menemukannya."/><small>30-1.000 karakter</small></div>
     <div className="form-section-title"><span>03</span><div><h2>Wilayah</h2><p>Gunakan patokan umum, bukan alamat rumah.</p></div></div>
-    <div className="form-two"><TextField label="Kota/kabupaten" id="city" placeholder="Contoh: Bandung"/><TextField label="Kecamatan" id="district" placeholder="Nama kecamatan"/></div>
-    <TextField label="Kelurahan/desa" id="village" placeholder="Nama kelurahan atau desa"/>
-    <TextField label="Patokan lokasi" id="locationDetail" placeholder="Contoh: depan taman lingkungan" hint="Hindari alamat rumah pribadi."/>
-    <div className="form-section-title"><span>04</span><div><h2>Titik lokasi (opsional)</h2><p>Cari titik dari patokan yang sudah diisi atau gunakan lokasi perangkat agar laporan dapat ditampilkan di peta.</p></div></div>
+    <TextField label="Cari tempat atau alamat umum" id="locationSearchQuery" required={false} placeholder="Contoh: Taman kota, Bandung" hint="Isi tempat/patokan, lalu cari titik untuk mengisi wilayah otomatis."/>
+    <div className="form-two"><TextField label="Kota/kabupaten" id="city" required={false} placeholder="Terisi dari pilihan lokasi"/><TextField label="Kecamatan" id="district" required={false} placeholder="Terisi dari pilihan lokasi"/></div>
+    <TextField label="Kelurahan/desa" id="village" required={false} placeholder="Terisi dari pilihan lokasi"/>
+    <TextField label="Patokan lokasi" id="locationDetail" required={false} placeholder="Terisi dari pilihan lokasi" hint="Hindari alamat rumah pribadi."/>
+    <div className="form-section-title"><span>04</span><div><h2>Titik lokasi (opsional)</h2><p>Pilih hasil pencarian untuk mengisi titik dan wilayah otomatis, atau gunakan lokasi perangkat.</p></div></div>
     <div className="report-coordinate-panel">
       <button type="button" className="button outline report-location-button" onClick={searchLocationFromAddress} disabled={locationBusy || busy}>
         <Search size={17} aria-hidden="true"/>{locationBusy ? 'Mencari lokasi…' : 'Cari titik dari lokasi'}
