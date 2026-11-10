@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Bell, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, Copy, Droplets, FileCheck2, FilePlus2, Filter, ImagePlus, Info, Lamp, LayoutDashboard, Link2, ListFilter, LockKeyhole, LogIn, MapPin, Menu, MessageSquareText, MoreHorizontal, Route, Search, Shapes, ShieldCheck, SlidersHorizontal, Sparkles, TrafficCone, Trash2, Trees, Users, Waves, X } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Clock3, Copy, Droplets, FileCheck2, FilePlus2, Filter, ImagePlus, Info, Lamp, LayoutDashboard, Link2, ListFilter, LockKeyhole, LogIn, MapPin, Menu, MessageSquareText, MoreHorizontal, Route, Search, Shapes, ShieldCheck, SlidersHorizontal, Sparkles, TrafficCone, Trash2, Trees, Waves, X } from 'lucide-react'
 import { statusInfo, categoryIconName, type Report, type Status } from '../shared/report-data'
 import { mediaSrc } from '../shared/api/client'
 import { useSession } from '../shared/session'
-import { NotificationBell } from './notifications'
 
 const iconByKey = {
   route: Route,
@@ -109,10 +108,10 @@ function AccountMenu({ mode }: { mode: 'reporter' | 'admin' }) {
   )
 }
 
-export function Header({ mode='public' }: { mode?:'public'|'reporter'|'admin' }) {
+export function Header({ mode='public' }: { mode?:'public'|'admin' }) {
   const [open,setOpen]=useState(false)
-  const links=mode==='public'?[['/','Beranda'],['/laporan','Laporan'],['/statistik','Statistik'],['/tentang','Tentang']]:mode==='admin'?[['/admin','Ringkasan'],['/admin/laporan','Semua laporan'],['/admin/statistik','Statistik']]:[['/dashboard','Ringkasan'],['/lapor/baru','Buat laporan']]
-  return <header className="topbar"><div className="nav-wrap"><Link to="/" className="brand" aria-label="LaporinAja, beranda"><span className="brand-mark"><MapPin size={18} fill="currentColor"/></span><span>Laporin<span>Aja</span></span></Link><button className="icon-button mobile-menu" aria-label={open?'Tutup navigasi':'Buka navigasi'} aria-expanded={open} onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button><nav className={`main-nav ${open?'nav-open':''}`} aria-label="Navigasi utama">{links.map(([to,label])=><NavLink end={to==='/' || to==='/dashboard' || to==='/admin'} onClick={()=>setOpen(false)} key={label} to={to} className={({isActive})=>isActive?'nav-link active':'nav-link'}>{label}</NavLink>)}{mode==='admin'&&<span className="role-pill"><ShieldCheck size={14}/> Administrator</span>}{mode==='reporter'&&<span className="role-pill"><Users size={14}/> Pelapor</span>}<div className="nav-actions">{mode==='public'?<><Button to="/masuk" variant="quiet">Masuk</Button><Button to="/daftar" icon={<ArrowRight size={16}/>}>Lapor</Button></>:mode==='reporter'?<><NotificationBell mode="reporter"/><AccountMenu mode="reporter"/></>:<AccountMenu mode="admin"/>}</div></nav></div></header>
+  const links=mode==='public'?[['/','Beranda'],['/laporan','Laporan'],['/statistik','Statistik'],['/tentang','Tentang']]:[['/admin','Ringkasan'],['/admin/laporan','Semua laporan'],['/admin/statistik','Statistik']]
+  return <header className="topbar"><div className="nav-wrap"><Link to="/" className="brand" aria-label="LaporinAja, beranda"><span className="brand-mark"><MapPin size={18} fill="currentColor"/></span><span>Laporin<span>Aja</span></span></Link><button className="icon-button mobile-menu" aria-label={open?'Tutup navigasi':'Buka navigasi'} aria-expanded={open} onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button><nav className={`main-nav ${open?'nav-open':''}`} aria-label="Navigasi utama">{links.map(([to,label])=><NavLink end={to==='/' || to==='/admin'} onClick={()=>setOpen(false)} key={label} to={to} className={({isActive})=>isActive?'nav-link active':'nav-link'}>{label}</NavLink>)}{mode==='admin'&&<span className="role-pill"><ShieldCheck size={14}/> Administrator</span>}<div className="nav-actions">{mode==='public'?<><Button to="/masuk" variant="quiet">Masuk</Button><Button to="/daftar" icon={<ArrowRight size={16}/>}>Lapor</Button></>:<AccountMenu mode="admin"/>}</div></nav></div></header>
 }
 
 export function Footer(){
@@ -131,7 +130,7 @@ export function Footer(){
   </div></footer>
 }
 
-export function AppShell({children, mode='public', footer=true, pageClass=''}: {children:ReactNode;mode?:'public'|'reporter'|'admin';footer?:boolean;pageClass?:string}){return <div className={`app-theme app-${mode} ${pageClass}`.trim()}><Header mode={mode}/>{children}{footer&&<Footer/>}</div>}
+export function AppShell({children, mode='public', footer=true, pageClass=''}: {children:ReactNode;mode?:'public'|'admin';footer?:boolean;pageClass?:string}){return <div className={`app-theme app-${mode} ${pageClass}`.trim()}><Header mode={mode}/>{children}{footer&&<Footer/>}</div>}
 
 export function PageIntro({title,description,action,eyebrow}:{title:string;description:string;action?:ReactNode;eyebrow?:string}){return <div className="page-intro"><div>{eyebrow&&<div className="eyebrow"><span aria-hidden="true"/>{eyebrow}</div>}<h1>{title}</h1><p>{description}</p></div>{action&&<div className="intro-action">{action}</div>}</div>}
 
