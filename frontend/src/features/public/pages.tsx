@@ -179,7 +179,7 @@ function readReportDraft(params: URLSearchParams): ReportDraft {
   const category = params.get('kategori') ?? ''
   const statusParam = params.get('status') ?? ''
   const status = (publicStatuses as string[]).includes(statusParam) ? (statusParam as Status) : ''
-  return { q: params.get('q') ?? '', category, status }
+  return { q: params.get('q')?.trim() ?? '', category, status }
 }
 
 export function Reports() {
@@ -189,12 +189,17 @@ export function Reports() {
   const [draft, setDraft] = useState<ReportDraft>(applied)
   const loadCategories = useCallback(() => getCategories(), [])
   const { data: categories } = useAsync(loadCategories, [])
+  const queryKey = JSON.stringify([applied.q, applied.category, applied.status, requestedPage])
 
   const loadReports = useCallback(
-    () => getPublicReports({ q: applied.q, category: applied.category, status: applied.status, page: requestedPage, limit: 6 }),
-    [applied.q, applied.category, applied.status, requestedPage],
+    async () => ({
+      queryKey,
+      result: await getPublicReports({ q: applied.q, category: applied.category, status: applied.status, page: requestedPage, limit: 6 }),
+    }),
+    [applied.q, applied.category, applied.status, requestedPage, queryKey],
   )
-  const { data, error, loading } = useAsync(loadReports, [applied.q, applied.category, applied.status, requestedPage])
+  const { data: reportResult, error, loading, reload: reloadReports } = useAsync(loadReports, [queryKey])
+  const data = reportResult?.result
 
   const total = data?.meta.total ?? 0
   const limit = data?.meta.limit ?? 6
@@ -204,11 +209,32 @@ export function Reports() {
   const start = total === 0 ? 0 : (currentPage - 1) * limit + 1
   const end = Math.min(currentPage * limit, total)
 
-  const appliedKey = `${applied.q}|${applied.category}|${applied.status}`
-  useEffect(() => { setDraft(applied) }, [appliedKey])
+  const appliedFiltersKey = `${applied.category}|${applied.status}`
+  useEffect(() => {
+    setDraft((current) => ({ ...current, category: applied.category, status: applied.status }))
+  }, [appliedFiltersKey])
 
   useEffect(() => {
-    if (!data) return
+    setDraft((current) => ({ ...current, q: applied.q }))
+  }, [applied.q])
+
+  useEffect(() => {
+    const keyword = draft.q.trim()
+    if (keyword === applied.q) return
+
+    const timeout = window.setTimeout(() => {
+      const next = new URLSearchParams(params)
+      if (keyword) next.set('q', keyword)
+      else next.delete('q')
+      next.delete('halaman')
+      setParams(next)
+    }, 300)
+
+    return () => window.clearTimeout(timeout)
+  }, [draft.q, applied.q, params, setParams])
+
+  useEffect(() => {
+    if (!data || reportResult?.queryKey !== queryKey) return
     const rawPage = params.get('halaman')
     const canonicalPage = currentPage === 1 ? null : String(currentPage)
     if (rawPage === canonicalPage) return
@@ -216,7 +242,7 @@ export function Reports() {
     if (canonicalPage === null) next.delete('halaman')
     else next.set('halaman', canonicalPage)
     setParams(next, { replace: true })
-  }, [params, currentPage, setParams, data])
+  }, [params, currentPage, setParams, data, reportResult, queryKey])
 
   function updateDraft(patch: Partial<ReportDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -257,10 +283,10 @@ export function Reports() {
     <PageIntro eyebrow="LAPORAN WARGA" title="Laporan warga" description="Temukan laporan fasilitas publik dan ikuti catatan perkembangannya."/>
     <form className="filter-panel listing-filter" role="search" aria-label="Filter laporan" onSubmit={applyFilters}>
       <label className="filter-field filter-field-search">
-        <span className="filter-label">Kata kunci</span>
+        <span className="filter-label">Cari kode atau judul</span>
         <span className="search-field">
           <Search size={18} aria-hidden="true"/>
-          <input type="search" value={draft.q} onChange={(event) => updateDraft({ q: event.target.value })} placeholder="Cari judul, kode, atau wilayah…"/>
+          <input type="search" value={draft.q} onChange={(event) => updateDraft({ q: event.target.value })} placeholder="LA-2026-000123 atau jalan berlubang"/>
         </span>
       </label>
       <div className="filter-field">
@@ -276,10 +302,15 @@ export function Reports() {
         <Button type="button" variant="outline" onClick={resetFilters}>Reset</Button>
       </div>
     </form>
-    {error ? <ErrorNote message={error instanceof ApiError ? error.message : 'Daftar laporan belum dapat dimuat.'}/> : loading ? <div className="empty-state"><Clock3 size={26}/><h2>Memuat laporan…</h2><p>Mengambil data dari layanan LaporinAja.</p></div> : total === 0
+    {loading ? <div className="empty-state"><Clock3 size={26}/><h2>Memuat laporan…</h2><p>Mengambil data dari layanan LaporinAja.</p></div> : error ? <div className="empty-state">
+        <SearchX size={28}/>
+        <h2>Daftar laporan tidak dapat dimuat</h2>
+        <p>{error instanceof ApiError ? error.message : 'Terjadi kesalahan saat memuat daftar laporan.'}</p>
+        <Button variant="outline" onClick={reloadReports}>Coba lagi</Button>
+      </div> : total === 0
       ? <div className="empty-state listing-empty">
           <SearchX size={32} aria-hidden="true"/>
-          <h2>Tidak ada laporan yang cocok</h2>
+          <h2>Tidak ada laporan yang cocok.</h2>
           <p>Coba kata kunci lain atau atur ulang filter untuk melihat laporan lain.</p>
           <Button variant="outline" onClick={resetFilters}>Reset filter</Button>
         </div>
