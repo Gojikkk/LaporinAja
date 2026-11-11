@@ -15,17 +15,19 @@ import {
   MapPin,
   MessageSquareText,
   MoreHorizontal,
+  Pencil,
   Search,
   SearchX,
   Send,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   Wrench,
   XCircle,
 } from 'lucide-react'
-import { Button, CategoryIcon, Dropdown, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
+import { Button, CategoryIcon, Dropdown, Modal, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
-import { createReport, getCategories, getMyReport, getMyReports, getPublicReport, reverseLookupReportLocation, searchReportLocations } from '../../shared/api/endpoints'
+import { createReport, deleteMyReport, getCategories, getMyReport, getMyReports, getPublicReport, reverseLookupReportLocation, searchReportLocations } from '../../shared/api/endpoints'
 import type { GeocodingCandidateDto } from '../../shared/api/types'
 import { useSession } from '../../shared/session'
 import { useAsync } from '../../shared/useAsync'
@@ -309,7 +311,7 @@ export function Dashboard() {
 
 /* ---------------------------------------------------------- laporan saya */
 
-function RowMenu({ code, isPublic }: { code: string; isPublic: boolean }) {
+function RowMenu({ code, isPublic, editable }: { code: string; isPublic: boolean; editable: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -338,6 +340,11 @@ function RowMenu({ code, isPublic }: { code: string; isPublic: boolean }) {
           <Link role="menuitem" to={`/dashboard/laporan/${code}`} onClick={() => setOpen(false)}>
             Lihat detail
           </Link>
+          {editable ? (
+            <Link role="menuitem" to={`/dashboard/laporan/${code}/edit`} onClick={() => setOpen(false)}>
+              Ubah laporan
+            </Link>
+          ) : null}
           {isPublic ? (
             <Link role="menuitem" to={`/laporan/${code}`} onClick={() => setOpen(false)}>
               Buka halaman publik
@@ -490,7 +497,11 @@ export function MyReports() {
                           <span className="rep-col-status">
                             <ReporterBadge status={row.status} />
                           </span>
-                          <RowMenu code={row.code} isPublic={publicStatuses.includes(row.status)} />
+                          <RowMenu
+                            code={row.code}
+                            isPublic={publicStatuses.includes(row.status)}
+                            editable={row.status === 'SUBMITTED' || row.status === 'REJECTED'}
+                          />
                         </article>
                       )
                     })}
@@ -637,8 +648,12 @@ function DuplicateCard({ report, primary }: { report: Report; primary: Report | 
   )
 }
 
-export function PrivateDetail() {
+export function PrivateDetail({ onToast }: { onToast: (message: string) => void }) {
   const { code = '' } = useParams()
+  const navigate = useNavigate()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const load = useCallback(() => getMyReport(code), [code])
   const { data, error, loading } = useAsync(load, [code])
   const primaryCode = data?.duplicateOf?.code
@@ -678,6 +693,21 @@ export function PrivateDetail() {
   const primary = primaryDetail ? toCard(mapDetailReport(primaryDetail)) : null
   const notice = statusNotice(report.status, rejection?.reason)
   const isPublic = publicStatuses.includes(report.status)
+  const editable = report.status === 'SUBMITTED' || report.status === 'REJECTED'
+
+  async function handleDelete() {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteMyReport(report.code)
+      onToast(`Laporan ${report.code} dihapus.`)
+      navigate('/dashboard/laporan')
+    } catch (reason) {
+      setDeleteError(errorMessage(reason, 'Laporan belum dapat dihapus. Coba lagi.'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <ReporterShell crumb={report.code}>
@@ -804,7 +834,54 @@ export function PrivateDetail() {
               <ArrowRight size={15} aria-hidden="true" />
             </Link>
           ) : null}
+          {editable ? (
+            <Link className="rep-btn rep-btn-outline" to={`/dashboard/laporan/${report.code}/edit`}>
+              <Pencil size={15} aria-hidden="true" />
+              Ubah laporan
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            className="rep-btn rep-btn-danger"
+            onClick={() => {
+              setDeleteError('')
+              setConfirmDelete(true)
+            }}
+          >
+            <Trash2 size={15} aria-hidden="true" />
+            Hapus laporan
+          </button>
         </div>
+
+        {confirmDelete ? (
+          <Modal title="Hapus laporan?" onClose={() => setConfirmDelete(false)}>
+            <p className="rep-card-note">
+              Laporan <b>{report.code}</b> beserta riwayat dan fotonya akan dihapus permanen. Tindakan ini
+              tidak dapat dibatalkan.
+            </p>
+            {deleteError ? (
+              <p className="rep-form-error" role="alert">{deleteError}</p>
+            ) : null}
+            <div className="rep-modal-actions">
+              <button
+                type="button"
+                className="rep-btn rep-btn-outline"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="rep-btn rep-btn-danger"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Menghapus…' : 'Ya, hapus laporan'}
+              </button>
+            </div>
+          </Modal>
+        ) : null}
       </div>
     </ReporterShell>
   )

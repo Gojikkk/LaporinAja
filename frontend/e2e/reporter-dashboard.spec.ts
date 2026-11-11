@@ -236,3 +236,83 @@ test('detail laporan duplikat menautkan ke laporan utama', async ({ page }) => {
     '/laporan/LPR-2026-000400',
   )
 })
+
+test('pelapor dapat mengubah laporan yang belum ditindaklanjuti', async ({ page }) => {
+  await stubSession(page)
+  const detail = {
+    ...listItem('LPR-2026-000500', 'Lampu jalan padam di taman', 'SUBMITTED'),
+    description: 'Lima tiang lampu padam sejak minggu lalu dan jalan menjadi gelap.',
+    city: 'Bandung',
+    locationDetail: 'Depan taman lingkungan',
+    photos: [{ url: '/media/evidence-1', mimeType: 'image/jpeg' }],
+    timeline: [],
+    followUps: [],
+    evidences: [],
+    duplicateOf: null,
+  }
+  let patched = false
+  await page.route('**/api/auth/csrf', (route) => route.fulfill({ json: { data: { csrfToken: 'test-csrf' } } }))
+  await page.route('**/api/categories', (route) => route.fulfill({
+    json: { data: [{ id: 2, name: 'Lampu jalan', slug: 'lampu-jalan' }] },
+  }))
+  await page.route('**/api/me/reports/*', (route) => {
+    if (route.request().method() === 'PATCH') {
+      patched = true
+      detail.title = 'Lampu jalan padam di taman kota'
+      return route.fulfill({ json: { data: { code: detail.code, status: 'SUBMITTED' } } })
+    }
+    return route.fulfill({ json: { data: detail } })
+  })
+
+  await page.goto('/dashboard/laporan/LPR-2026-000500')
+  await page.getByRole('link', { name: 'Ubah laporan' }).click()
+  await expect(page).toHaveURL('/dashboard/laporan/LPR-2026-000500/edit')
+  await expect(page.getByRole('heading', { name: 'Perbarui laporanmu.' })).toBeVisible()
+  await expect(page.getByLabel('Judul laporan *')).toHaveValue('Lampu jalan padam di taman')
+  await expect(page.getByLabel('Kategori *')).toHaveValue('2')
+
+  await page.getByLabel('Judul laporan *').fill('Lampu jalan padam di taman kota')
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click()
+
+  await expect.poll(() => patched).toBe(true)
+  await expect(page).toHaveURL('/dashboard/laporan/LPR-2026-000500')
+  await expect(page.getByRole('heading', { name: 'Lampu jalan padam di taman kota' })).toBeVisible()
+  await expect(page.locator('.toast')).toContainText('Perubahan laporan LPR-2026-000500 disimpan.')
+})
+
+test('pelapor dapat menghapus laporannya setelah konfirmasi', async ({ page }) => {
+  await stubSession(page)
+  const detail = {
+    ...listItem('LPR-2026-000600', 'Lampu jalan padam di taman', 'SUBMITTED'),
+    description: 'Lima tiang lampu padam sejak minggu lalu dan jalan menjadi gelap.',
+    city: 'Bandung',
+    locationDetail: 'Depan taman lingkungan',
+    photos: [],
+    timeline: [],
+    followUps: [],
+    evidences: [],
+    duplicateOf: null,
+  }
+  let deleted = false
+  await page.route('**/api/auth/csrf', (route) => route.fulfill({ json: { data: { csrfToken: 'test-csrf' } } }))
+  await page.route('**/api/me/reports?*', (route) => route.fulfill({
+    json: { data: [], meta: { page: 1, limit: 50, total: 0 }, counts: {} },
+  }))
+  await page.route('**/api/me/reports/*', (route) => {
+    if (route.request().method() === 'DELETE') {
+      deleted = true
+      return route.fulfill({ json: { data: { code: detail.code, deleted: true } } })
+    }
+    return route.fulfill({ json: { data: detail } })
+  })
+
+  await page.goto('/dashboard/laporan/LPR-2026-000600')
+  await page.getByRole('button', { name: 'Hapus laporan' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Hapus laporan?' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Ya, hapus laporan' }).click()
+
+  await expect.poll(() => deleted).toBe(true)
+  await expect(page).toHaveURL('/dashboard/laporan')
+  await expect(page.locator('.toast')).toContainText('Laporan LPR-2026-000600 dihapus.')
+})
