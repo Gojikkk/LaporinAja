@@ -26,7 +26,6 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Button, CategoryIcon, Dropdown, Modal, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
-import { Button, CategoryIcon, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
 import { createReport, deleteMyReport, getCategories, getMyReport, getMyReports, getPublicReport, reverseLookupReportLocation, searchReportLocations } from '../../shared/api/endpoints'
 import type { GeocodingCandidateDto } from '../../shared/api/types'
