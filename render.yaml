@@ -10,6 +10,7 @@ services:
     name: laporinaja-staging-api
     runtime: docker
     plan: free
+    branch: development
     autoDeployTrigger: off
     region: singapore
     rootDir: backend
@@ -42,6 +43,7 @@ services:
   - type: web
     name: laporinaja-staging-web
     runtime: static
+    branch: development
     autoDeployTrigger: off
     rootDir: frontend
     buildCommand: npm ci && npm run build

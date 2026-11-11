@@ -82,6 +82,13 @@ npm run dev
 
 Vite menyediakan frontend di `http://localhost:5173`. URL API default adalah `http://localhost:3000/api`; ubah `VITE_API_URL` di `frontend/.env.local` jika backend berjalan di alamat lain. Build produksi frontend dapat dibuat dengan `npm run build` dari folder `frontend/`.
 
+## Alur branch
+
+- `development` adalah branch integrasi. Push fitur ke branch ini untuk menjalankan tes dan deploy staging.
+- `main` adalah branch stabil. Perubahan masuk lewat pull request dari `development` setelah staging lolos.
+- Lindungi `main` di GitHub: **Settings → Branches → Add branch protection rule**, aktifkan **Require a pull request before merging** dan **Require status checks to pass** (`Backend tests and build`, `Frontend build`).
+- Set default branch repository ke `development` di **Settings → General → Default branch** agar clone dan PR baru mengarah ke branch integrasi.
+
 ## Deploy staging ke Render
 
 Repository menyediakan [Blueprint Render](./render.yaml) untuk PostgreSQL, API Docker, dan frontend static dengan plan Free. Dari Render, pilih **New → Blueprint** dan hubungkan repository. Blueprint memakai URL default `laporinaja-staging-web.onrender.com` dan `laporinaja-staging-api.onrender.com`; isi tiga kredensial Cloudinary saat diminta dan gunakan folder `laporinaja-staging`.
@@ -97,14 +104,18 @@ Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan s
 
 ### CI/CD otomatis ke Render
 
-Workflow [GitHub Actions](./.github/workflows/ci-cd.yml) menjalankan tes backend, build backend, dan build frontend pada setiap push serta pull request ke `main`. Deploy hanya berjalan setelah semua job tersebut berhasil dan commit masuk ke `main` (atau workflow dijalankan manual pada `main`).
+Workflow [GitHub Actions](./.github/workflows/ci-cd.yml) menjalankan tes backend, build backend, dan build frontend pada setiap push serta pull request ke `development` atau `main`. Deploy hanya berjalan setelah semua job tersebut berhasil.
+
+- Push ke `development` otomatis mendeploy staging memakai `RENDER_API_DEPLOY_HOOK` dan `RENDER_WEB_DEPLOY_HOOK`.
+- Push ke `main` mendeploy production hanya jika `RENDER_API_DEPLOY_HOOK_PROD` dan `RENDER_WEB_DEPLOY_HOOK_PROD` diset.
 
 Untuk mengaktifkan deploy:
 
 1. Di Render, buat deploy hook terpisah pada service `laporinaja-staging-api` dan `laporinaja-staging-web`.
 2. Di GitHub, buka **Settings → Secrets and variables → Actions → New repository secret** dan simpan URL hook API sebagai `RENDER_API_DEPLOY_HOOK`, serta URL hook frontend sebagai `RENDER_WEB_DEPLOY_HOOK`.
-3. Hubungkan Blueprint Render ke branch `main`. `autoDeployTrigger: off` mencegah Render melewati pemeriksaan CI dan hanya deploy saat workflow memanggil kedua hook.
-4. Buka **Actions** di GitHub untuk melihat hasil tes/build dan status pemicu deploy. Pantau penyelesaian deploy serta health check masing-masing service di Render.
+3. Hubungkan Blueprint Render staging ke branch `development`. `autoDeployTrigger: off` mencegah Render melewati pemeriksaan CI dan hanya deploy saat workflow memanggil kedua hook.
+4. Jika sudah punya service production, simpan hook-nya sebagai `RENDER_API_DEPLOY_HOOK_PROD` dan `RENDER_WEB_DEPLOY_HOOK_PROD`.
+5. Buka **Actions** di GitHub untuk melihat hasil tes/build dan status pemicu deploy. Pantau penyelesaian deploy serta health check masing-masing service di Render.
 
 Jangan masukkan URL deploy hook atau kredensial ke repository, issue, maupun chat. Workflow ini mendeploy konfigurasi staging Render yang tersedia di repository; database Free tetap sementara dan tidak cocok untuk menyimpan data production jangka panjang.
 
