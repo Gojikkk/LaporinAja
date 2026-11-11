@@ -1,4 +1,4 @@
-﻿import { Prisma, ReportStatus } from "@prisma/client";
+import { Prisma, ReportStatus } from "@prisma/client";
 import { prisma } from "../db";
 import { generatePublicCode } from "../utils/public-code";
 import { sendReportStatusEmail } from "./email.service";
