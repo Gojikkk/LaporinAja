@@ -431,6 +431,34 @@
   border-color: #cbd5e1;
 }
 
+.rep-btn-danger {
+  background: var(--rep-danger-soft);
+  border-color: var(--rep-danger-soft);
+  color: var(--rep-danger);
+}
+
+.rep-btn-danger:hover {
+  background: #fee2e2;
+  border-color: #fee2e2;
+}
+
+.rep-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.rep-form-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--rep-danger-soft);
+  color: var(--rep-danger);
+  font-weight: 600;
+}
+
 /* --------------------------------------------------------------- metric grid */
 
 .rep-metrics {

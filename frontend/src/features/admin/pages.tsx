@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   RotateCcw,
   SearchX,
   Send,
+  Trash2,
   Wrench,
   X,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ import { ApiError, mediaSrc } from '../../shared/api/client'
 import {
   addFollowUp,
   changeReportStatus,
+  deleteAdminReport,
   exportAdminReports,
   getAdminCategories,
   getAdminReport,
@@ -486,6 +488,53 @@ function ActionDialog({ kind, report, candidates, onClose, onDone }: {
 
 function valueLength(value: string) { return value.trim().length }
 
+function DeleteReportDialog({ code, onClose, onDeleted }: {
+  code: string
+  onClose: () => void
+  onDeleted: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (dialog && !dialog.open) dialog.showModal()
+  }, [])
+
+  async function handleDelete() {
+    setBusy(true)
+    setError('')
+    try {
+      await deleteAdminReport(code)
+      onDeleted()
+    } catch (reason) {
+      setError(errorMessage(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <dialog ref={dialogRef} className="adm-dialog" aria-labelledby="adm-delete-title"
+    onCancel={(event) => { event.preventDefault(); onClose() }}
+    onClick={(event) => { if (event.target === dialogRef.current) onClose() }}>
+    <div className="adm-dialog-body">
+      <div className="adm-dialog-head">
+        <div>
+          <h2 className="adm-dialog-title" id="adm-delete-title">Hapus laporan?</h2>
+          <p className="adm-dialog-copy">Laporan <b>{code}</b> beserta riwayat, tindak lanjut, dan seluruh fotonya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>
+        </div>
+        <button type="button" className="adm-icon-btn" aria-label="Tutup dialog" onClick={onClose}><X size={18} aria-hidden="true"/></button>
+      </div>
+      {error ? <p className="adm-error" role="alert"><CircleAlert size={16} aria-hidden="true"/><span>{error}</span></p> : null}
+      <div className="adm-dialog-actions">
+        <button type="button" className="adm-btn adm-btn-outline" onClick={onClose} disabled={busy}>Batal</button>
+        <button type="button" className="adm-btn adm-btn-danger" onClick={handleDelete} disabled={busy}>{busy ? 'Menghapus…' : 'Ya, hapus laporan'}</button>
+      </div>
+    </div>
+  </dialog>
+}
+
 function Gallery({ report }: { report: AdminReport }) {
   const date = formatSubmitted(report.submittedAt)
   return <section className="adm-gallery" aria-label="Galeri bukti">
@@ -530,7 +579,9 @@ function AdminReportLocation({ latitude, longitude }: { latitude: number; longit
 export function AdminDetail() {
   useAdminTitle('Tinjau laporan')
   const { code = '' } = useParams()
+  const navigate = useNavigate()
   const [dialog, setDialog] = useState<ActionKind | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [toast, setToast] = useState('')
 
   const loadDetail = useCallback(() => getAdminReport(code), [code])
@@ -575,6 +626,14 @@ export function AdminDetail() {
       </> : <p className="adm-card-note">{readonly ?? 'Tidak ada tindakan yang tersedia untuk status ini.'}</p>}
     </section>
 
+    <section className="adm-card" aria-labelledby="adm-delete">
+      <h2 className="adm-card-title" id="adm-delete">Hapus laporan</h2>
+      <p className="adm-card-note">Menghapus laporan akan menghapus riwayat, tindak lanjut, dan seluruh foto secara permanen. Laporan yang menjadi acuan laporan duplikat tidak dapat dihapus.</p>
+      <div className="adm-action-list">
+        <button type="button" className="adm-btn adm-btn-danger" onClick={() => setConfirmDelete(true)}><Trash2 size={16} aria-hidden="true"/> Hapus laporan</button>
+      </div>
+    </section>
+
     {report.status === 'DUPLICATE' ? <section className="adm-card" aria-labelledby="adm-primary">
       <p className="adm-eyebrow">RUJUKAN DUPLIKAT</p>
       <h2 className="adm-card-title" id="adm-primary">Laporan utama</h2>
@@ -595,6 +654,7 @@ export function AdminDetail() {
     <Link className="adm-btn adm-btn-outline adm-back" to="/admin/laporan">Kembali ke manajemen laporan</Link>
 
     {dialog ? <ActionDialog kind={dialog} report={report} candidates={candidates} onClose={() => setDialog(null)} onDone={(message) => { setDialog(null); setToast(message); reload(); reloadCandidates() }}/> : null}
+    {confirmDelete ? <DeleteReportDialog code={report.code} onClose={() => setConfirmDelete(false)} onDeleted={() => navigate('/admin/laporan')}/> : null}
     {toast ? <div className="adm-toast" role="status" aria-live="polite"><CheckCircle2 size={18} aria-hidden="true"/><span>{toast}</span></div> : null}
   </AdminShell>
 }
