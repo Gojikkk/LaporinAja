@@ -148,7 +148,7 @@ export function Dropdown({label,value,options,onChange,icon,labelledBy}:{label:s
   const ref=useRef<HTMLDivElement>(null)
   useEffect(()=>{
     if(!open) return
-    const close=(e:MouseEvent)=>{if(ref.current&&!(e.target as Node).contains(ref.current))setOpen(false)}
+    const close=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node))setOpen(false)}
     document.addEventListener('mousedown',close)
     return()=>document.removeEventListener('mousedown',close)
   },[open])
