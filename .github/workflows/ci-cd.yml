@@ -81,22 +81,27 @@ jobs:
       - frontend
     runs-on: ubuntu-latest
     steps:
-      - name: Verify staging deploy hooks are configured
+      - name: Check staging deploy hooks
+        id: hooks
         env:
           RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
           RENDER_WEB_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
         run: |
-          if [[ -z "$RENDER_API_DEPLOY_HOOK" || -z "$RENDER_WEB_DEPLOY_HOOK" ]]; then
-            echo "::error::Add RENDER_API_DEPLOY_HOOK and RENDER_WEB_DEPLOY_HOOK in GitHub Actions secrets."
-            exit 1
+          if [[ -n "$RENDER_API_DEPLOY_HOOK" && -n "$RENDER_WEB_DEPLOY_HOOK" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Staging deploy hooks belum diset. Deploy staging dilewati."
           fi
 
       - name: Deploy staging API
+        if: steps.hooks.outputs.configured == 'true'
         env:
           RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
         run: curl --fail --silent --show-error --request POST "$RENDER_API_DEPLOY_HOOK"
 
       - name: Deploy staging frontend
+        if: steps.hooks.outputs.configured == 'true'
         env:
           RENDER_WEB_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
         run: curl --fail --silent --show-error --request POST "$RENDER_WEB_DEPLOY_HOOK"

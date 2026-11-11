@@ -106,7 +106,7 @@ Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan s
 
 Workflow [GitHub Actions](./.github/workflows/ci-cd.yml) menjalankan tes backend, build backend, dan build frontend pada setiap push serta pull request ke `development` atau `main`. Deploy hanya berjalan setelah semua job tersebut berhasil.
 
-- Push ke `development` otomatis mendeploy staging memakai `RENDER_API_DEPLOY_HOOK` dan `RENDER_WEB_DEPLOY_HOOK`.
+- Push ke `development` mendeploy staging jika `RENDER_API_DEPLOY_HOOK` dan `RENDER_WEB_DEPLOY_HOOK` diset. Jika belum, deploy dilewati dan CI tetap hijau.
 - Push ke `main` mendeploy production hanya jika `RENDER_API_DEPLOY_HOOK_PROD` dan `RENDER_WEB_DEPLOY_HOOK_PROD` diset.
 
 Untuk mengaktifkan deploy:
