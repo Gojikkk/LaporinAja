@@ -24,7 +24,7 @@ const adminReportFiltersSchema = z.object({
   category: z.string().trim().min(1).optional()
 });
 
-const createReportSchema = z.object({
+const reportFields = {
   categoryId: z.coerce.number().int().positive(),
   title: z.string().trim().min(10, "Judul minimal 10 karakter").max(100, "Judul maksimal 100 karakter"),
   description: z.string().trim().min(30, "Deskripsi minimal 30 karakter").max(1000, "Deskripsi maksimal 1000 karakter"),
@@ -39,9 +39,13 @@ const createReportSchema = z.object({
   longitude: z.preprocess(
     (value) => value === "" ? undefined : value,
     z.coerce.number().min(-180, "Longitude harus antara -180 dan 180").max(180, "Longitude harus antara -180 dan 180").optional()
-  ),
-  submissionKey: z.uuid("submissionKey harus UUID")
-}).superRefine((body, context) => {
+  )
+};
+
+function requirePairedCoordinates(
+  body: { latitude?: number; longitude?: number },
+  context: z.RefinementCtx
+) {
   if ((body.latitude === undefined) !== (body.longitude === undefined)) {
     const missingCoordinate = body.latitude === undefined ? "latitude" : "longitude";
     context.addIssue({
@@ -50,7 +54,14 @@ const createReportSchema = z.object({
       message: "Latitude dan longitude harus diisi bersama"
     });
   }
-});
+}
+
+const createReportSchema = z.object({
+  ...reportFields,
+  submissionKey: z.uuid("submissionKey harus UUID")
+}).superRefine(requirePairedCoordinates);
+
+const updateReportSchema = z.object(reportFields).superRefine(requirePairedCoordinates);
 
 const followUpSchema = z.object({
   note: z.string().trim().min(10, "Catatan minimal 10 karakter").max(500, "Catatan maksimal 500 karakter"),
@@ -123,6 +134,23 @@ export const getMyReport: RequestHandler = async (request, response) => {
   sendData(response, await reportService.getOwnerReport(request.user!.id, getCode(request)));
 };
 
+export const updateMyReport: RequestHandler = async (request, response) => {
+  const body = parseBody(updateReportSchema, request.body);
+  sendData(
+    response,
+    await reportService.updateOwnerReport(
+      request.user!.id,
+      getCode(request),
+      body,
+      uploadedFiles(request)
+    )
+  );
+};
+
+export const deleteMyReport: RequestHandler = async (request, response) => {
+  sendData(response, await reportService.deleteOwnerReport(request.user!.id, getCode(request)));
+};
+
 export const listAdminReports: RequestHandler = async (request, response) => {
   const { page, limit } = pagination(request);
   const filters = parseQuery(adminReportFiltersSchema, request.query);
@@ -142,6 +170,10 @@ export const exportAdminReports: RequestHandler = async (request, response) => {
 
 export const getAdminReport: RequestHandler = async (request, response) => {
   sendData(response, await reportService.getAdminReport(getCode(request)));
+};
+
+export const deleteAdminReport: RequestHandler = async (request, response) => {
+  sendData(response, await reportService.deleteAdminReport(getCode(request)));
 };
 
 export const addFollowUp: RequestHandler = async (request, response) => {

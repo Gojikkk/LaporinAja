@@ -45,6 +45,21 @@ reportsRoutes.post(
 );
 reportsRoutes.get("/me/reports", requireAuth, requireRole("PELAPOR"), reportController.listMyReports);
 reportsRoutes.get("/me/reports/:code", requireAuth, requireRole("PELAPOR"), reportController.getMyReport);
+reportsRoutes.patch(
+  "/me/reports/:code",
+  requireAuth,
+  requireRole("PELAPOR"),
+  requireCsrf,
+  uploadMiddleware,
+  reportController.updateMyReport
+);
+reportsRoutes.delete(
+  "/me/reports/:code",
+  requireAuth,
+  requireRole("PELAPOR"),
+  requireCsrf,
+  reportController.deleteMyReport
+);
 
 reportsRoutes.get("/admin/reports", requireAuth, requireRole("ADMIN"), reportController.listAdminReports);
 reportsRoutes.get(
@@ -54,6 +69,13 @@ reportsRoutes.get(
   reportController.exportAdminReports
 );
 reportsRoutes.get("/admin/reports/:code", requireAuth, requireRole("ADMIN"), reportController.getAdminReport);
+reportsRoutes.delete(
+  "/admin/reports/:code",
+  requireAuth,
+  requireRole("ADMIN"),
+  requireCsrf,
+  reportController.deleteAdminReport
+);
 reportsRoutes.post(
   "/admin/reports/:code/follow-ups",
   requireAuth,
