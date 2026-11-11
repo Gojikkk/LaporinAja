@@ -138,6 +138,10 @@ export type CreateReportInput = {
   photos: File[]
 }
 
+export type UpdateReportInput = Omit<CreateReportInput, 'submissionKey' | 'photos'> & {
+  photos?: File[]
+}
+
 export type StatusChangeInput = {
   toStatus: Status
   expectedStatus: Status

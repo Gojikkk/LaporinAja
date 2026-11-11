@@ -18,6 +18,7 @@ import type {
   PublicTrendsDto,
   SessionUser,
   StatusChangeInput,
+  UpdateReportInput,
 } from './types'
 
 type QueryValue = string | number | boolean | null | undefined
@@ -126,6 +127,30 @@ export function getMyReport(code: string) {
   return apiData<OwnerReportDetailDto>(`/me/reports/${encodeURIComponent(code)}`)
 }
 
+export function updateMyReport(code: string, input: UpdateReportInput) {
+  const body = new FormData()
+  body.append('categoryId', String(input.categoryId))
+  body.append('title', input.title)
+  body.append('description', input.description)
+  body.append('city', input.city)
+  body.append('district', input.district)
+  body.append('village', input.village)
+  body.append('locationDetail', input.locationDetail)
+  if (input.latitude !== undefined) body.append('latitude', String(input.latitude))
+  if (input.longitude !== undefined) body.append('longitude', String(input.longitude))
+  for (const photo of input.photos ?? []) body.append('photos', photo)
+  return apiData<{ code: string; status: Status }>(`/me/reports/${encodeURIComponent(code)}`, {
+    method: 'PATCH',
+    body,
+  })
+}
+
+export function deleteMyReport(code: string) {
+  return apiData<{ code: string; deleted: boolean }>(`/me/reports/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+  })
+}
+
 export type AdminReportQuery = { status?: Status | ''; category?: string; page?: number; limit?: number }
 
 export function getAdminReports(params: AdminReportQuery = {}) {
@@ -134,6 +159,12 @@ export function getAdminReports(params: AdminReportQuery = {}) {
 
 export function getAdminReport(code: string) {
   return apiData<AdminReportDetailDto>(`/admin/reports/${encodeURIComponent(code)}`)
+}
+
+export function deleteAdminReport(code: string) {
+  return apiData<{ code: string; deleted: boolean }>(`/admin/reports/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+  })
 }
 
 export function exportAdminReports(params: { status?: Status | ''; category?: string } = {}) {
