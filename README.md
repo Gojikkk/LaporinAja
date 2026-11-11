@@ -84,40 +84,42 @@ Vite menyediakan frontend di `http://localhost:5173`. URL API default adalah `ht
 
 ## Alur branch
 
-- `development` adalah branch integrasi. Push fitur ke branch ini untuk menjalankan tes dan deploy staging.
-- `main` adalah branch stabil. Perubahan masuk lewat pull request dari `development` setelah staging lolos.
+- `development` adalah branch integrasi/staging. Setiap push menjalankan tes dan build di GitHub Actions, lalu memicu deploy backend staging. Netlify juga membangun branch `development` ke URL staging tersendiri.
+- Cek hasilnya di URL staging Netlify, termasuk login, laporan, dan upload. Setelah lolos, buat pull request `development` → `main`; merge ke `main` memperbarui situs production Netlify.
 - Lindungi `main` di GitHub: **Settings → Branches → Add branch protection rule**, aktifkan **Require a pull request before merging** dan **Require status checks to pass** (`Backend tests and build`, `Frontend build`).
 - Set default branch repository ke `development` di **Settings → General → Default branch** agar clone dan PR baru mengarah ke branch integrasi.
 
-## Deploy staging ke Render
+## Deploy staging: Netlify + Render + Neon
 
-Repository menyediakan [Blueprint Render](./render.yaml) untuk PostgreSQL, API Docker, dan frontend static dengan plan Free. Dari Render, pilih **New → Blueprint** dan hubungkan repository. Blueprint memakai URL default `laporinaja-staging-web.onrender.com` dan `laporinaja-staging-api.onrender.com`; isi tiga kredensial Cloudinary saat diminta dan gunakan folder `laporinaja-staging`.
+Frontend production tetap di Netlify (`laporinaja-app.netlify.app`). Backend staging berjalan sebagai Docker Web Service gratis di Render; databasenya Neon Free. Render free service dapat dipakai tanpa payment method, tidur setelah 15 menit idle, dan biasanya perlu sekitar satu menit untuk bangun. Kuotanya 750 jam instance per workspace per bulan; pemakaian bandwidth/build yang melewati kuota akan menghentikan layanan/build jika belum menambahkan payment method, bukan menagih kartu. Cocok untuk staging, bukan production yang butuh selalu aktif. Neon Free juga tidak memerlukan kartu; gunakan project/database terpisah untuk staging.
 
-Setelah kedua service web dibuat, set:
+### Setup satu kali
 
-- Jika URL Render yang diberikan berbeda dari default di atas, ubah `FRONTEND_ORIGINS` pada API ke origin frontend staging persis (tanpa trailing slash), dan `VITE_API_URL` pada frontend ke URL API staging ditambah `/api`.
-- Biarkan `VITE_CSRF_ENDPOINT=/auth/csrf`, `SESSION_COOKIE_SECURE=true`, dan `SESSION_COOKIE_SAME_SITE=none` untuk HTTPS staging.
+1. Pastikan branch `development` sudah ada dan berisi perubahan terbaru.
+2. Di Netlify, buka **Project configuration → Build & deploy → Continuous deployment → Branches and deploy contexts**. Aktifkan branch deploy untuk `development`. URL umumnya `https://development--laporinaja-app.netlify.app`.
+3. Di pengaturan environment variables Netlify, buat `VITE_API_URL=/api` untuk context **Branch deploys**. Atur juga `VITE_GOOGLE_CLIENT_ID` pada context yang sesuai bila login Google digunakan. Production (`main`) tetap memakai `VITE_API_URL` production yang sudah ada.
+4. Di Neon, buat database/project khusus staging dan salin kedua connection string: pooled URL untuk aplikasi dan direct URL untuk migrasi Prisma. Jangan gunakan database production.
+5. Di Render, pilih **New → Blueprint**, hubungkan repository, dan deploy [Blueprint](./render.yaml). Pastikan Blueprint membuat hanya `laporinaja-staging-api`. Saat diminta, isi `DATABASE_URL` dengan pooled Neon URL, `DIRECT_URL` dengan direct Neon URL, serta tiga kredensial Cloudinary. `SESSION_SECRET` dibuat otomatis. Folder upload Cloudinary staging diset ke `laporinaja-staging`.
+6. URL branch staging memakai Netlify proxy `/api/*` ke `https://laporinaja-staging-api.onrender.com`, agar cookie sesi tetap same-site. Jika Render memberi service URL berbeda, ubah target proxy di [netlify.toml](./netlify.toml) lalu push ke `development`. Pada environment Render, pastikan `FRONTEND_ORIGINS` berisi origin Netlify staging dan production, dipisahkan koma tanpa trailing slash. Jika URL staging Netlify berbeda, sesuaikan nilainya.
+7. Di Render, buat **Deploy Hook** pada `laporinaja-staging-api`. Simpan URL-nya di GitHub repository **Settings → Secrets and variables → Actions** sebagai `RENDER_API_DEPLOY_HOOK`. Netlify branch deploy akan berjalan otomatis dari push; backend staging baru di-deploy oleh workflow setelah tes/build CI berhasil.
+8. Push perubahan ke `development`. Tunggu GitHub Actions dan deploy Netlify selesai, lalu buka URL branch staging. Registrasi akun uji dilakukan di staging; jangan masukkan data pribadi/produksi.
 
-Perubahan environment frontend perlu di-build ulang. Migrasi database berjalan saat API start; Render tidak men-seed data demo otomatis. Di plan Free, Shell service API tidak tersedia, jadi buat akun uji lewat halaman registrasi. Gunakan database dan kredensial staging yang terpisah dari production.
+`DATABASE_URL` pooled dipakai API, sedangkan `DIRECT_URL` (opsional lokal) dipakai Prisma untuk migrasi. Migrasi otomatis berjalan saat container API start. Blueprint sengaja tidak membuat database Render atau frontend Render. Render Free tidak menyediakan persistent disk; simpan gambar di Cloudinary. Jangan seed staging jika seed berisi akun/kredensial demo yang tidak ingin dipublikasikan.
 
-**Batasan plan Free:** API akan sleep setelah 15 menit tanpa trafik dan perlu sekitar satu menit untuk bangun saat ada request. Database Free dibatasi 1 GB dan otomatis kedaluwarsa setelah 30 hari; data database akan dihapus setelah masa tenggang jika tidak di-upgrade. Static Site gratis. Cek pemakaian bandwidth/build dan spend limit di dashboard Render agar tidak kena biaya tambahan.
+### Alur kerja sehari-hari
+
+Edit dan push ke `development` → GitHub Actions menguji backend/frontend dan deploy backend staging → Netlify memperbarui branch staging → cek hasil di URL staging → jika lolos, PR dan merge `development` ke `main`. Tidak perlu mengubah atau deploy dari `main` untuk mengecek pekerjaan development. Deploy otomatis Netlify dapat selesai terpisah dari CI; pemeriksaan build Netlify tetap berjalan sendiri.
 
 ### CI/CD otomatis ke Render
 
 Workflow [GitHub Actions](./.github/workflows/ci-cd.yml) menjalankan tes backend, build backend, dan build frontend pada setiap push serta pull request ke `development` atau `main`. Deploy hanya berjalan setelah semua job tersebut berhasil.
 
-- Push ke `development` mendeploy staging jika `RENDER_API_DEPLOY_HOOK` dan `RENDER_WEB_DEPLOY_HOOK` diset. Jika belum, deploy dilewati dan CI tetap hijau.
+- Push ke `development` mendeploy API staging jika `RENDER_API_DEPLOY_HOOK` diset. Jika belum, deploy backend dilewati dan CI tetap hijau. Netlify menangani branch deploy frontend secara langsung.
 - Push ke `main` mendeploy production hanya jika `RENDER_API_DEPLOY_HOOK_PROD` dan `RENDER_WEB_DEPLOY_HOOK_PROD` diset.
 
-Untuk mengaktifkan deploy:
+Jika backend production juga masih di Render, hook production tetap terpisah sebagai `RENDER_API_DEPLOY_HOOK_PROD`. Jangan isi secret production dengan hook staging.
 
-1. Di Render, buat deploy hook terpisah pada service `laporinaja-staging-api` dan `laporinaja-staging-web`.
-2. Di GitHub, buka **Settings → Secrets and variables → Actions → New repository secret** dan simpan URL hook API sebagai `RENDER_API_DEPLOY_HOOK`, serta URL hook frontend sebagai `RENDER_WEB_DEPLOY_HOOK`.
-3. Hubungkan Blueprint Render staging ke branch `development`. `autoDeployTrigger: off` mencegah Render melewati pemeriksaan CI dan hanya deploy saat workflow memanggil kedua hook.
-4. Jika sudah punya service production, simpan hook-nya sebagai `RENDER_API_DEPLOY_HOOK_PROD` dan `RENDER_WEB_DEPLOY_HOOK_PROD`.
-5. Buka **Actions** di GitHub untuk melihat hasil tes/build dan status pemicu deploy. Pantau penyelesaian deploy serta health check masing-masing service di Render.
-
-Jangan masukkan URL deploy hook atau kredensial ke repository, issue, maupun chat. Workflow ini mendeploy konfigurasi staging Render yang tersedia di repository; database Free tetap sementara dan tidak cocok untuk menyimpan data production jangka panjang.
+Jangan masukkan URL deploy hook atau kredensial ke repository, issue, maupun chat.
 
 ### Preview publik sementara tanpa kartu
 

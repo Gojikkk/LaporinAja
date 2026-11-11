@@ -85,13 +85,12 @@ jobs:
         id: hooks
         env:
           RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
-          RENDER_WEB_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
         run: |
-          if [[ -n "$RENDER_API_DEPLOY_HOOK" && -n "$RENDER_WEB_DEPLOY_HOOK" ]]; then
+          if [[ -n "$RENDER_API_DEPLOY_HOOK" ]]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Staging deploy hooks belum diset. Deploy staging dilewati."
+            echo "::notice::Render API deploy hook belum diset. Deploy backend staging dilewati."
           fi
 
       - name: Deploy staging API
@@ -99,12 +98,6 @@ jobs:
         env:
           RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
         run: curl --fail --silent --show-error --request POST "$RENDER_API_DEPLOY_HOOK"
-
-      - name: Deploy staging frontend
-        if: steps.hooks.outputs.configured == 'true'
-        env:
-          RENDER_WEB_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
-        run: curl --fail --silent --show-error --request POST "$RENDER_WEB_DEPLOY_HOOK"
 
   deploy-production:
     name: Deploy production (main)
