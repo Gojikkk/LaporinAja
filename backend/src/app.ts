@@ -10,6 +10,10 @@ import { swaggerOptions } from "./config/swagger";
 
 const app = express();
 
+// Trust the first proxy hop (required for Vercel, Netlify, and any reverse proxy)
+// so that express-rate-limit reads the correct client IP from X-Forwarded-For
+app.set("trust proxy", 1);
+
 app.disable("x-powered-by");
 app.use(corsAndOrigin);
 app.use(express.json({ limit: env.maxUploadRequestBytes }));
