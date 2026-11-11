@@ -141,18 +141,44 @@ test('daftar laporan saya memfilter status, membagi halaman, dan membuka detail'
   await expect(page.locator('.rep-row')).toHaveCount(2)
   await expect(page.getByText('Menampilkan 9–10 dari 10 laporan')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Status' }).click()
-  await page.getByRole('option', { name: 'Ditolak' }).click()
+  await page.getByLabel('Status').selectOption('REJECTED')
+  await expect(page.getByLabel('Status')).toHaveValue('REJECTED')
   await expect(page.locator('.rep-row')).toHaveCount(1)
   await expect(page.getByRole('link', { name: 'LPR-2026-000201' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Status' }).click()
-  await page.getByRole('option', { name: 'Semua status' }).click()
+  await page.getByLabel('Status').selectOption('')
+  await expect(page.getByLabel('Status')).toHaveValue('')
   await expect(page.locator('.rep-row')).toHaveCount(8)
   await page.getByRole('button', { name: /Aksi lain untuk laporan/ }).first().click()
   await page.getByRole('menuitem', { name: 'Lihat detail' }).click()
   await expect(page).toHaveURL('/dashboard/laporan/LPR-2026-000100')
   await expect(page.getByRole('heading', { name: 'Lampu mati nomor 1' })).toBeVisible()
+})
+
+test('daftar laporan saya memfilter kategori', async ({ page }) => {
+  await stubSession(page)
+  const rows = [
+    listItem('LPR-2026-000401', 'Lampu mati di gang', 'SUBMITTED', 'Lampu jalan'),
+    listItem('LPR-2026-000402', 'Jalan berlubang di simpang', 'SUBMITTED', 'Jalan rusak'),
+    listItem('LPR-2026-000403', 'Sampah menumpuk di pasar', 'SUBMITTED', 'Sampah'),
+  ]
+  await page.route('**/api/me/reports?*', (route) =>
+    route.fulfill({
+      json: { data: rows, meta: { page: 1, limit: 50, total: rows.length }, counts },
+    }),
+  )
+
+  await page.goto('/dashboard/laporan')
+  await expect(page.locator('.rep-row')).toHaveCount(3)
+
+  await page.getByLabel('Kategori').selectOption('Jalan rusak')
+  await expect(page.getByLabel('Kategori')).toHaveValue('Jalan rusak')
+  await expect(page.locator('.rep-row')).toHaveCount(1)
+  await expect(page.getByRole('link', { name: 'Jalan berlubang di simpang' })).toBeVisible()
+
+  await page.getByLabel('Kategori').selectOption('')
+  await expect(page.getByLabel('Kategori')).toHaveValue('')
+  await expect(page.locator('.rep-row')).toHaveCount(3)
 })
 
 test('detail laporan selesai menampilkan bukti penyelesaian', async ({ page }) => {

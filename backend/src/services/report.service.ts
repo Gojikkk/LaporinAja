@@ -41,6 +41,8 @@ export type CreateReportInput = {
   submissionKey: string;
 };
 
+export type UpdateReportInput = Omit<CreateReportInput, "submissionKey">;
+
 export type FollowUpInput = {
   note: string;
   isResolutionNote: boolean;
@@ -410,6 +412,117 @@ export async function getOwnerReport(reporterId: string, code: string) {
   return ownerReportDto(report);
 }
 
+export async function updateOwnerReport(
+  reporterId: string,
+  code: string,
+  body: UpdateReportInput,
+  files: Express.Multer.File[]
+) {
+  const report = await prisma.report.findFirst({
+    where: { publicCode: code, reporterId },
+    select: {
+      id: true,
+      status: true,
+      evidences: { where: { kind: "REPORT_PHOTO" }, select: { storageKey: true } }
+    }
+  });
+  if (!report) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
+  if (report.status !== "SUBMITTED" && report.status !== "REJECTED") {
+    throw new HttpError(
+      409,
+      "REPORT_LOCKED",
+      "Laporan hanya dapat diubah sebelum ditindaklanjuti"
+    );
+  }
+
+  const category = await prisma.reportCategory.findFirst({
+    where: { id: body.categoryId, isActive: true },
+    select: { id: true }
+  });
+  if (!category) {
+    throw new HttpError(422, "VALIDATION_ERROR", "Data tidak valid", {
+      categoryId: "Kategori tidak tersedia"
+    });
+  }
+
+  const filesOnDisk = files.length ? await storeImages(files) : [];
+  try {
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.report.updateMany({
+        where: { id: report.id, status: report.status },
+        data: {
+          categoryId: body.categoryId,
+          title: body.title,
+          description: body.description,
+          city: body.city,
+          district: body.district,
+          village: body.village,
+          locationDetail: body.locationDetail,
+          latitude: body.latitude ?? null,
+          longitude: body.longitude ?? null
+        }
+      });
+      if (updated.count !== 1) {
+        throw new HttpError(
+          409,
+          "STATUS_CONFLICT",
+          "Status laporan sudah berubah, muat ulang halaman"
+        );
+      }
+      if (filesOnDisk.length) {
+        await tx.reportEvidence.deleteMany({
+          where: { reportId: report.id, kind: "REPORT_PHOTO" }
+        });
+        await tx.reportEvidence.createMany({
+          data: filesOnDisk.map((file) => ({
+            reportId: report.id,
+            uploadedBy: reporterId,
+            kind: "REPORT_PHOTO",
+            ...file
+          }))
+        });
+      }
+    });
+    if (filesOnDisk.length) {
+      await deleteStoredImages(report.evidences.map(({ storageKey }) => storageKey));
+    }
+    return { code, status: report.status };
+  } catch (error) {
+    if (filesOnDisk.length) {
+      await deleteStoredImages(filesOnDisk.map(({ storageKey }) => storageKey));
+    }
+    throw error;
+  }
+}
+
+async function deleteReportRecord(report: { id: string; evidences: Array<{ storageKey: string }> }) {
+  const duplicateCount = await prisma.report.count({ where: { duplicateOfReportId: report.id } });
+  if (duplicateCount > 0) {
+    throw new HttpError(
+      409,
+      "REPORT_REFERENCED",
+      "Laporan ini menjadi acuan laporan duplikat dan belum dapat dihapus"
+    );
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.reportEvidence.deleteMany({ where: { reportId: report.id } });
+    await tx.reportFollowUp.deleteMany({ where: { reportId: report.id } });
+    await tx.reportStatusHistory.deleteMany({ where: { reportId: report.id } });
+    await tx.report.delete({ where: { id: report.id } });
+  });
+  await deleteStoredImages(report.evidences.map(({ storageKey }) => storageKey));
+}
+
+export async function deleteOwnerReport(reporterId: string, code: string) {
+  const report = await prisma.report.findFirst({
+    where: { publicCode: code, reporterId },
+    select: { id: true, evidences: { select: { storageKey: true } } }
+  });
+  if (!report) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
+  await deleteReportRecord(report);
+  return { code, deleted: true };
+}
+
 export async function listAdminReports(
   page: number,
   limit: number,
@@ -490,6 +603,16 @@ export async function getAdminReport(code: string) {
   });
   if (!report) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
   return adminReportDto(report);
+}
+
+export async function deleteAdminReport(code: string) {
+  const report = await prisma.report.findUnique({
+    where: { publicCode: code },
+    select: { id: true, evidences: { select: { storageKey: true } } }
+  });
+  if (!report) throw new HttpError(404, "NOT_FOUND", "Laporan tidak ditemukan");
+  await deleteReportRecord(report);
+  return { code, deleted: true };
 }
 
 export async function addFollowUp(

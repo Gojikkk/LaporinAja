@@ -20,10 +20,10 @@ const mocks = vi.hoisted(() => {
       session: model(["create", "findUnique", "deleteMany"]),
       user: model(["create", "findUnique", "update"]),
       reportCategory: model(["create", "findMany", "findFirst", "findUnique", "update"]),
-      report: model(["count", "create", "createMany", "findFirst", "findUnique", "findMany", "updateMany"]),
-      reportStatusHistory: model(["create", "findMany"]),
-      reportFollowUp: model(["create", "findFirst", "findMany"]),
-      reportEvidence: model(["create", "createMany", "findUnique", "findMany"]),
+      report: model(["count", "create", "createMany", "findFirst", "findUnique", "findMany", "updateMany", "delete"]),
+      reportStatusHistory: model(["create", "findMany", "deleteMany"]),
+      reportFollowUp: model(["create", "findFirst", "findMany", "deleteMany"]),
+      reportEvidence: model(["create", "createMany", "findUnique", "findMany", "deleteMany"]),
       notification: model(["create", "findMany", "findFirst", "updateMany"]),
       $transaction: fn(),
       $queryRaw: fn(),
@@ -523,6 +523,232 @@ describe("report and privacy contract", () => {
       where: { publicCode: "LPR-2026-000002", reporterId: user.id }
     }));
     expect(mocks.prisma.report.findFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets a reporter replace the content and photos of their own SUBMITTED report", async () => {
+    const png = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ffffff" }
+    }).png().toBuffer();
+    mocks.prisma.report.findFirst.mockResolvedValue({
+      id: reportData.id,
+      status: "SUBMITTED",
+      evidences: [{ storageKey: "laporinaja-test/old-photo" }]
+    });
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 2 });
+    mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportEvidence.deleteMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportEvidence.createMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(app)
+      .patch("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"))
+      .field("categoryId", "2")
+      .field("title", "Lampu jalan mati diperbarui")
+      .field("description", "Lampu jalan di depan sekolah mati total dan sangat gelap pada malam hari.")
+      .field("city", "Bandung")
+      .field("district", "Coblong")
+      .field("village", "Dago")
+      .field("locationDetail", "Depan gerbang sekolah dasar")
+      .field("latitude", "-6.1752")
+      .field("longitude", "106.8271")
+      .attach("photos", png, { filename: "baru.png", contentType: "image/png" });
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.data).toEqual({ code: "LPR-2026-000001", status: "SUBMITTED" });
+    expect(mocks.prisma.report.updateMany).toHaveBeenCalledWith({
+      where: { id: reportData.id, status: "SUBMITTED" },
+      data: expect.objectContaining({
+        categoryId: 2,
+        city: "Bandung",
+        latitude: -6.1752,
+        longitude: 106.8271
+      })
+    });
+    expect(mocks.prisma.reportEvidence.deleteMany).toHaveBeenCalledWith({
+      where: { reportId: reportData.id, kind: "REPORT_PHOTO" }
+    });
+    expect(mocks.prisma.reportEvidence.createMany).toHaveBeenCalled();
+    expect(mocks.cloudinary.uploader.destroy).toHaveBeenCalledWith("laporinaja-test/old-photo", { invalidate: true, resource_type: "image", type: "authenticated" });
+  });
+
+  it("keeps existing photos when a reporter edits without uploading new ones", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue({
+      id: reportData.id,
+      status: "REJECTED",
+      evidences: [{ storageKey: "laporinaja-test/old-photo" }]
+    });
+    mocks.prisma.reportCategory.findFirst.mockResolvedValue({ id: 1 });
+    mocks.prisma.report.updateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(app)
+      .patch("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"))
+      .field("categoryId", "1")
+      .field("title", "Lampu jalan mati diperbarui")
+      .field("description", "Lampu jalan di depan sekolah mati total dan sangat gelap pada malam hari.")
+      .field("city", "Bandung")
+      .field("district", "Coblong")
+      .field("village", "Dago")
+      .field("locationDetail", "Depan gerbang sekolah dasar");
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.data.status).toBe("REJECTED");
+    expect(mocks.prisma.reportEvidence.deleteMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.reportEvidence.createMany).not.toHaveBeenCalled();
+    expect(mocks.cloudinary.uploader.destroy).not.toHaveBeenCalled();
+  });
+
+  it("rejects edits to a report that has been followed up", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue({
+      id: reportData.id,
+      status: "IN_PROGRESS",
+      evidences: []
+    });
+
+    const response = await request(app)
+      .patch("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"))
+      .field("categoryId", "1")
+      .field("title", "Lampu jalan mati diperbarui")
+      .field("description", "Lampu jalan di depan sekolah mati total dan sangat gelap pada malam hari.")
+      .field("city", "Bandung")
+      .field("district", "Coblong")
+      .field("village", "Dago")
+      .field("locationDetail", "Depan gerbang sekolah dasar");
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("REPORT_LOCKED");
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when editing another reporter's report", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue(null);
+
+    const response = await request(app)
+      .patch("/api/me/reports/LPR-2026-000002")
+      .set(mutationHeaders("PELAPOR"))
+      .field("categoryId", "1")
+      .field("title", "Lampu jalan mati diperbarui")
+      .field("description", "Lampu jalan di depan sekolah mati total dan sangat gelap pada malam hari.")
+      .field("city", "Bandung")
+      .field("district", "Coblong")
+      .field("village", "Dago")
+      .field("locationDetail", "Depan gerbang sekolah dasar");
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("NOT_FOUND");
+    expect(mocks.prisma.report.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("validates edited report fields before touching the database", async () => {
+    const response = await request(app)
+      .patch("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"))
+      .field("categoryId", "1")
+      .field("title", "Pendek")
+      .field("description", "Lampu jalan di depan sekolah mati total dan sangat gelap pada malam hari.")
+      .field("city", "Bandung")
+      .field("district", "Coblong")
+      .field("village", "Dago")
+      .field("locationDetail", "Depan gerbang sekolah dasar");
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fields.title).toBe("Judul minimal 10 karakter");
+    expect(mocks.prisma.report.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("deletes a reporter's report with its history, follow-ups, and stored photos", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue({
+      id: reportData.id,
+      evidences: [
+        { storageKey: "laporinaja-test/photo-one" },
+        { storageKey: "laporinaja-test/photo-two" }
+      ]
+    });
+    mocks.prisma.report.count.mockResolvedValue(0);
+    mocks.prisma.reportEvidence.deleteMany.mockResolvedValue({ count: 2 });
+    mocks.prisma.reportFollowUp.deleteMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportStatusHistory.deleteMany.mockResolvedValue({ count: 3 });
+    mocks.prisma.report.delete.mockResolvedValue({ id: reportData.id });
+
+    const response = await request(app)
+      .delete("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"));
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.data).toEqual({ code: "LPR-2026-000001", deleted: true });
+    expect(mocks.prisma.reportEvidence.deleteMany).toHaveBeenCalledWith({ where: { reportId: reportData.id } });
+    expect(mocks.prisma.reportFollowUp.deleteMany).toHaveBeenCalledWith({ where: { reportId: reportData.id } });
+    expect(mocks.prisma.reportStatusHistory.deleteMany).toHaveBeenCalledWith({ where: { reportId: reportData.id } });
+    expect(mocks.prisma.report.delete).toHaveBeenCalledWith({ where: { id: reportData.id } });
+    expect(mocks.cloudinary.uploader.destroy).toHaveBeenCalledWith("laporinaja-test/photo-one", { invalidate: true, resource_type: "image", type: "authenticated" });
+    expect(mocks.cloudinary.uploader.destroy).toHaveBeenCalledWith("laporinaja-test/photo-two", { invalidate: true, resource_type: "image", type: "authenticated" });
+  });
+
+  it("refuses to delete a report that is the target of a duplicate report", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue({ id: reportData.id, evidences: [] });
+    mocks.prisma.report.count.mockResolvedValue(2);
+
+    const response = await request(app)
+      .delete("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"));
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("REPORT_REFERENCED");
+    expect(mocks.prisma.report.delete).not.toHaveBeenCalled();
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when deleting another reporter's report", async () => {
+    mocks.prisma.report.findFirst.mockResolvedValue(null);
+
+    const response = await request(app)
+      .delete("/api/me/reports/LPR-2026-000002")
+      .set(mutationHeaders("PELAPOR"));
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("NOT_FOUND");
+    expect(mocks.prisma.report.delete).not.toHaveBeenCalled();
+  });
+
+  it("lets an administrator delete any report", async () => {
+    mocks.prisma.report.findUnique.mockResolvedValue({
+      id: reportData.id,
+      evidences: [{ storageKey: "laporinaja-test/admin-photo" }]
+    });
+    mocks.prisma.report.count.mockResolvedValue(0);
+    mocks.prisma.reportEvidence.deleteMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.reportFollowUp.deleteMany.mockResolvedValue({ count: 0 });
+    mocks.prisma.reportStatusHistory.deleteMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.report.delete.mockResolvedValue({ id: reportData.id });
+
+    const response = await request(app)
+      .delete("/api/admin/reports/LPR-2026-000001")
+      .set(mutationHeaders("ADMIN"));
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.data).toEqual({ code: "LPR-2026-000001", deleted: true });
+    expect(mocks.prisma.report.findUnique).toHaveBeenCalledWith({
+      where: { publicCode: "LPR-2026-000001" },
+      select: { id: true, evidences: { select: { storageKey: true } } }
+    });
+    expect(mocks.prisma.report.delete).toHaveBeenCalledWith({ where: { id: reportData.id } });
+    expect(mocks.cloudinary.uploader.destroy).toHaveBeenCalledWith("laporinaja-test/admin-photo", { invalidate: true, resource_type: "image", type: "authenticated" });
+  });
+
+  it("reserves report deletion for the matching role", async () => {
+    const reporterDeletesAdmin = await request(app)
+      .delete("/api/admin/reports/LPR-2026-000001")
+      .set(mutationHeaders("PELAPOR"));
+    const adminDeletesOwn = await request(app)
+      .delete("/api/me/reports/LPR-2026-000001")
+      .set(mutationHeaders("ADMIN"));
+
+
+    expect(reporterDeletesAdmin.status).toBe(403);
+    expect(adminDeletesOwn.status).toBe(403);
+    expect(mocks.prisma.report.delete).not.toHaveBeenCalled();
   });
 
   it("TC-13 lists only the signed-in reporter's reports with pagination, status filter, and their status counts", async () => {

@@ -26,6 +26,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Button, CategoryIcon, Dropdown, Modal, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
+import { Button, CategoryIcon, PageIntro, PrimaryReportCard, StatCard, StatusBadge, TextField, Timeline } from '../../components/ui'
 import { ApiError, mediaSrc } from '../../shared/api/client'
 import { createReport, deleteMyReport, getCategories, getMyReport, getMyReports, getPublicReport, reverseLookupReportLocation, searchReportLocations } from '../../shared/api/endpoints'
 import type { GeocodingCandidateDto } from '../../shared/api/types'
@@ -405,30 +406,31 @@ export function MyReports() {
           <>
             <div className="rep-filter-card">
               <div className="rep-field">
-                <span id="rep-status-label">Status</span>
-                <Dropdown
-                  label="Status"
-                  labelledBy="rep-status-label"
+                <label id="rep-status-label" htmlFor="rep-status-filter">Status</label>
+                <select
+                  id="rep-status-filter"
+                  className="rep-filter-select"
                   value={status}
-                  onChange={(value) => setStatus(value as Status | '')}
-                  options={[
-                    { value: '', label: 'Semua status' },
-                    ...(Object.keys(reporterStatus) as Status[]).map((value) => ({
-                      value,
-                      label: reporterStatus[value].text,
-                    })),
-                  ]}
-                />
+                  onChange={(event) => setStatus(event.currentTarget.value as Status | '')}
+                >
+                  <option value="">Semua status</option>
+                  {(Object.keys(reporterStatus) as Status[]).map((value) => (
+                    <option key={value} value={value}>{reporterStatus[value].text}</option>
+                  ))}
+                </select>
               </div>
               <div className="rep-field">
-                <span id="rep-category-label">Kategori</span>
-                <Dropdown
-                  label="Kategori"
-                  labelledBy="rep-category-label"
+                <label id="rep-category-label" htmlFor="rep-category-filter">Kategori</label>
+                <select
+                  id="rep-category-filter"
+                  className="rep-filter-select"
                   value={category}
-                  onChange={setCategory}
-                  options={categoryOptions}
-                />
+                  onChange={(event) => setCategory(event.currentTarget.value)}
+                >
+                  {categoryOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 

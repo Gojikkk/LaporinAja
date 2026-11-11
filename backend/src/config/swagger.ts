@@ -368,6 +368,10 @@ const components = {
       description: "Tidak ditemukan",
       content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
     },
+    "409": {
+      description: "Konflik status atau relasi laporan",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+    },
     "422": {
       description: "Validasi input gagal",
       content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
@@ -1018,6 +1022,110 @@ const paths: Record<string, any> = {
         "404": { $ref: "#/components/responses/404" },
       },
     },
+    patch: {
+      tags: ["My Reports"],
+      summary: "Ubah laporan milik pelapor (PELAPOR)",
+      description:
+        "Memperbarui isi laporan berstatus `SUBMITTED` atau `REJECTED`. Request harus `multipart/form-data`. " +
+        "Jika `photos` dikirim, seluruh foto laporan diganti dengan 1-3 foto baru.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        { $ref: "#/components/parameters/ReportCodeParam" },
+        { $ref: "#/components/parameters/CsrfHeader" },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          "multipart/form-data": {
+            schema: {
+              type: "object",
+              required: ["categoryId", "title", "description", "city", "district", "village", "locationDetail"],
+              properties: {
+                categoryId:     { type: "integer", example: 2, description: "ID dari GET /api/categories" },
+                title:          { type: "string", minLength: 10, maxLength: 100, example: "Lampu jalan mati di depan sekolah" },
+                description:    { type: "string", minLength: 30, maxLength: 1000, example: "Lampu penerangan jalan sudah mati sejak seminggu lalu dan membahayakan pejalan kaki." },
+                city:           { type: "string", maxLength: 100, example: "Jakarta Pusat" },
+                district:       { type: "string", maxLength: 100, example: "Menteng" },
+                village:        { type: "string", maxLength: 100, example: "Menteng" },
+                locationDetail: { type: "string", minLength: 5, maxLength: 200, example: "Depan gerbang SDN 01 Menteng" },
+                latitude:       { type: "number", minimum: -90, maximum: 90, nullable: true, example: -6.1752 },
+                longitude:      { type: "number", minimum: -180, maximum: 180, nullable: true, example: 106.8271 },
+                photos: {
+                  type: "array",
+                  items: { type: "string", format: "binary" },
+                  minItems: 1,
+                  maxItems: 3,
+                  description: "Opsional; jika diisi, mengganti seluruh foto laporan",
+                },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        "200": {
+          description: "Laporan berhasil diubah",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "object",
+                    properties: {
+                      code: { type: "string", example: "LPR-2026-000001" },
+                      status: { $ref: "#/components/schemas/ReportStatus" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "404": { $ref: "#/components/responses/404" },
+        "409": { $ref: "#/components/responses/409" },
+        "422": { $ref: "#/components/responses/422" },
+      },
+    },
+    delete: {
+      tags: ["My Reports"],
+      summary: "Hapus laporan milik pelapor (PELAPOR)",
+      description:
+        "Menghapus laporan beserta riwayat status, tindak lanjut, dan fotonya. " +
+        "Laporan yang menjadi acuan laporan duplikat tidak dapat dihapus.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        { $ref: "#/components/parameters/ReportCodeParam" },
+        { $ref: "#/components/parameters/CsrfHeader" },
+      ],
+      responses: {
+        "200": {
+          description: "Laporan berhasil dihapus",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "object",
+                    properties: {
+                      code: { type: "string", example: "LPR-2026-000001" },
+                      deleted: { type: "boolean", example: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "404": { $ref: "#/components/responses/404" },
+        "409": { $ref: "#/components/responses/409" },
+      },
+    },
   },
 
   "/api/me/notifications": {
@@ -1162,6 +1270,43 @@ const paths: Record<string, any> = {
         "401": { $ref: "#/components/responses/401" },
         "403": { $ref: "#/components/responses/403" },
         "404": { $ref: "#/components/responses/404" },
+      },
+    },
+    delete: {
+      tags: ["Admin Reports"],
+      summary: "Hapus laporan (ADMIN)",
+      description:
+        "Menghapus laporan beserta riwayat status, tindak lanjut, dan fotonya. " +
+        "Laporan yang menjadi acuan laporan duplikat tidak dapat dihapus.",
+      security: [{ cookieAuth: [] }],
+      parameters: [
+        { $ref: "#/components/parameters/ReportCodeParam" },
+        { $ref: "#/components/parameters/CsrfHeader" },
+      ],
+      responses: {
+        "200": {
+          description: "Laporan berhasil dihapus",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "object",
+                    properties: {
+                      code: { type: "string", example: "LPR-2026-000001" },
+                      deleted: { type: "boolean", example: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "401": { $ref: "#/components/responses/401" },
+        "403": { $ref: "#/components/responses/403" },
+        "404": { $ref: "#/components/responses/404" },
+        "409": { $ref: "#/components/responses/409" },
       },
     },
   },

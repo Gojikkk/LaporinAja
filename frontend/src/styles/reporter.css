@@ -1100,11 +1100,30 @@
   min-width: 0;
 }
 
-.rep-field > span {
+.rep-field > span,
+.rep-field > label {
   color: var(--rep-ink);
   font-size: 14px;
   font-weight: 700;
   line-height: 150%;
+}
+
+.rep-filter-select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--rep-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--rep-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 150%;
+}
+
+.rep-filter-select:focus-visible {
+  outline: 2px solid var(--rep-teal);
+  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------- detail */
