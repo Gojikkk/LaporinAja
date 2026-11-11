@@ -141,13 +141,13 @@ test('daftar laporan saya memfilter status, membagi halaman, dan membuka detail'
   await expect(page.locator('.rep-row')).toHaveCount(2)
   await expect(page.getByText('Menampilkan 9–10 dari 10 laporan')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Status' }).click()
-  await page.getByRole('option', { name: 'Ditolak' }).click()
+  await page.getByLabel('Status').selectOption('REJECTED')
+  await expect(page.getByLabel('Status')).toHaveValue('REJECTED')
   await expect(page.locator('.rep-row')).toHaveCount(1)
   await expect(page.getByRole('link', { name: 'LPR-2026-000201' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Status' }).click()
-  await page.getByRole('option', { name: 'Semua status' }).click()
+  await page.getByLabel('Status').selectOption('')
+  await expect(page.getByLabel('Status')).toHaveValue('')
   await expect(page.locator('.rep-row')).toHaveCount(8)
   await page.getByRole('button', { name: /Aksi lain untuk laporan/ }).first().click()
   await page.getByRole('menuitem', { name: 'Lihat detail' }).click()
@@ -171,13 +171,13 @@ test('daftar laporan saya memfilter kategori', async ({ page }) => {
   await page.goto('/dashboard/laporan')
   await expect(page.locator('.rep-row')).toHaveCount(3)
 
-  await page.getByRole('button', { name: 'Kategori' }).click()
-  await page.getByRole('option', { name: 'Jalan rusak' }).click()
+  await page.getByLabel('Kategori').selectOption('Jalan rusak')
+  await expect(page.getByLabel('Kategori')).toHaveValue('Jalan rusak')
   await expect(page.locator('.rep-row')).toHaveCount(1)
   await expect(page.getByRole('link', { name: 'Jalan berlubang di simpang' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Kategori' }).click()
-  await page.getByRole('option', { name: 'Semua kategori' }).click()
+  await page.getByLabel('Kategori').selectOption('')
+  await expect(page.getByLabel('Kategori')).toHaveValue('')
   await expect(page.locator('.rep-row')).toHaveCount(3)
 })
 
