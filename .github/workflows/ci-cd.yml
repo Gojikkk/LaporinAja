@@ -2,8 +2,12 @@ name: CI/CD
 
 on:
   push:
+    branches:
+      - development
+      - main
   pull_request:
     branches:
+      - development
       - main
   workflow_dispatch:
 
@@ -69,30 +73,61 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-  deploy-render:
-    name: Deploy to Render
+  deploy-staging:
+    name: Deploy staging (development)
+    if: github.ref == 'refs/heads/development' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check staging deploy hooks
+        id: hooks
+        env:
+          RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+        run: |
+          if [[ -n "$RENDER_API_DEPLOY_HOOK" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Render API deploy hook belum diset. Deploy backend staging dilewati."
+          fi
+
+      - name: Deploy staging API
+        if: steps.hooks.outputs.configured == 'true'
+        env:
+          RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+        run: curl --fail --silent --show-error --request POST "$RENDER_API_DEPLOY_HOOK"
+
+  deploy-production:
+    name: Deploy production (main)
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs:
       - backend
       - frontend
     runs-on: ubuntu-latest
     steps:
-      - name: Verify Render deploy hooks are configured
+      - name: Check production deploy hooks
+        id: hooks
         env:
-          RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
-          RENDER_WEB_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
+          RENDER_API_DEPLOY_HOOK_PROD: ${{ secrets.RENDER_API_DEPLOY_HOOK_PROD }}
+          RENDER_WEB_DEPLOY_HOOK_PROD: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_PROD }}
         run: |
-          if [[ -z "$RENDER_API_DEPLOY_HOOK" || -z "$RENDER_WEB_DEPLOY_HOOK" ]]; then
-            echo "::error::Add RENDER_API_DEPLOY_HOOK and RENDER_WEB_DEPLOY_HOOK in GitHub Actions secrets."
-            exit 1
+          if [[ -n "$RENDER_API_DEPLOY_HOOK_PROD" && -n "$RENDER_WEB_DEPLOY_HOOK_PROD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Production deploy hooks belum diset. Deploy production dilewati."
           fi
 
-      - name: Deploy API
+      - name: Deploy production API
+        if: steps.hooks.outputs.configured == 'true'
         env:
-          RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
-        run: curl --fail --silent --show-error --request POST "$RENDER_API_DEPLOY_HOOK"
+          RENDER_API_DEPLOY_HOOK_PROD: ${{ secrets.RENDER_API_DEPLOY_HOOK_PROD }}
+        run: curl --fail --silent --show-error --request POST "$RENDER_API_DEPLOY_HOOK_PROD"
 
-      - name: Deploy frontend
+      - name: Deploy production frontend
+        if: steps.hooks.outputs.configured == 'true'
         env:
-          RENDER_WEB_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
-        run: curl --fail --silent --show-error --request POST "$RENDER_WEB_DEPLOY_HOOK"
+          RENDER_WEB_DEPLOY_HOOK_PROD: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_PROD }}
+        run: curl --fail --silent --show-error --request POST "$RENDER_WEB_DEPLOY_HOOK_PROD"

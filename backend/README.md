@@ -189,7 +189,8 @@ Copy `.env.example` to `.env` and fill in all required values.
 
 | Variable | Required | Default | Notes |
 |---|---|---|---|
-| `DATABASE_URL` | ✅ | — | PostgreSQL connection string |
+| `DATABASE_URL` | ✅ | — | PostgreSQL connection string used by the API (use Neon pooled URL) |
+| `DIRECT_URL` | | `DATABASE_URL` | Optional direct PostgreSQL connection used by Prisma migrations (recommended for Neon) |
 | `SESSION_SECRET` | ✅ | — | Min 32 chars, random string |
 | `CLOUDINARY_CLOUD_NAME` | ✅ | — | From Cloudinary dashboard |
 | `CLOUDINARY_API_KEY` | ✅ | — | From Cloudinary dashboard |

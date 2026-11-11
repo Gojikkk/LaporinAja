@@ -9,6 +9,12 @@
   VITE_CSRF_HEADER_NAME = "X-CSRF-Token"
 
 [[redirects]]
+  from = "/api/*"
+  to = "https://laporin-aja-seven.vercel.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

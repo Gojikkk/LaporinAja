@@ -1,4 +1,4 @@
-﻿import { Prisma, ReportStatus } from "@prisma/client";
+import { Prisma, ReportStatus } from "@prisma/client";
 import { prisma } from "../db";
 import { generatePublicCode } from "../utils/public-code";
 import { sendReportStatusEmail } from "./email.service";
@@ -819,14 +819,16 @@ export async function changeReportStatus(
     return history;
   });
   try {
-    await sendReportStatusEmail({
-      to: report.reporter.email,
-      reportCode: code,
-      reportTitle: report.title,
-      previousStatus: body.expectedStatus,
-      newStatus: body.toStatus,
-      message: statusNotificationMessages[body.toStatus]
-    });
+    if (report.reporter?.email) {
+      await sendReportStatusEmail({
+        to: report.reporter.email,
+        reportCode: code,
+        reportTitle: report.title,
+        previousStatus: body.expectedStatus,
+        newStatus: body.toStatus,
+        message: statusNotificationMessages[body.toStatus]
+      });
+    }
   } catch (error) {
     console.error("Gagal mengirim email perubahan status laporan", {
       reportCode: code,
