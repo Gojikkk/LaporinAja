@@ -59,7 +59,7 @@ if (Boolean(smtpUser) !== Boolean(smtpPassword)) {
 export const env = {
   frontendOrigins: (process.env.FRONTEND_ORIGINS ?? "http://localhost:5173")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean),
   sessionSecret,
   googleClientId: process.env.GOOGLE_CLIENT_ID,
