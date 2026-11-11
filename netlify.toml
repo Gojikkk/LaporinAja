@@ -10,7 +10,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://laporinaja-staging-api.onrender.com/api/:splat"
+  to = "https://laporin-aja-seven.vercel.app/api/:splat"
   status = 200
   force = true
 
